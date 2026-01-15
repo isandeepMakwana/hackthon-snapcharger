@@ -78,11 +78,14 @@ const App = () => {
         : loginIntent === 'host'
           ? 'Host dashboard access requires a host account. Sign in as a host to continue.'
           : undefined;
+    const loginDefaultRole =
+      loginIntent === 'host' ? 'host' : loginIntent === 'book' ? 'driver' : undefined;
     return (
       <LoginPage
         onLogin={handleLogin}
         onNavigateToRegister={() => setAuthState('register')}
         notice={loginMessage}
+        defaultRole={loginDefaultRole}
       />
     );
   }
