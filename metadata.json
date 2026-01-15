@@ -1,0 +1,7 @@
+{
+  "name": "SnapCharge",
+  "description": "Airbnb for EV Charging in India with AI-powered station registration.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
