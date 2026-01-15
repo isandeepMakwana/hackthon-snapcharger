@@ -6,3 +6,9 @@ firebase-admin
 geopy
 boto3
 python-dotenv
+bcrypt
+PyJWT
+slowapi
+email-validator
+pytest
+requests
