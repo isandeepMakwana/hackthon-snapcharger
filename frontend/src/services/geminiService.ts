@@ -19,7 +19,7 @@ export const fileToGenerativePart = async (file: File): Promise<string> => {
 
 export const analyzeChargerImage = async (file: File): Promise<GeminiAnalysisResult> => {
   try {
-    const apiKey = process.env.VITE_GEMINI_API_KEY;
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     if (!apiKey) {
       console.warn('No VITE_GEMINI_API_KEY found. Using mock simulation.');
