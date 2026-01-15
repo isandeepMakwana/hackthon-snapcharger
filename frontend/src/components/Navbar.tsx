@@ -8,7 +8,7 @@ interface NavbarProps {
   isAuthenticated: boolean;
   onLoginClick: () => void;
   onLogout: () => void;
-  authRole: 'driver' | 'host' | null;
+  authRole: 'driver' | 'host' | 'admin' | null;
 }
 
 const Navbar = ({
@@ -109,7 +109,7 @@ const Navbar = ({
                   <div className="border-b border-border px-4 py-3">
                     <p className="text-sm font-semibold text-ink">Signed in</p>
                     <p className="text-xs text-muted">
-                      Role: {authRole === 'host' ? 'Host' : 'Driver'}
+                      Role: {authRole === 'host' ? 'Host' : authRole === 'admin' ? 'Admin' : 'Driver'}
                     </p>
                   </div>
                   <button

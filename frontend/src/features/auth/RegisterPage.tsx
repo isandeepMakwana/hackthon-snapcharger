@@ -2,7 +2,14 @@ import { useState } from 'react';
 import { ArrowRight, Car, Home, Loader2, Lock, Mail, User, Zap } from 'lucide-react';
 
 interface RegisterPageProps {
-  onRegister: (role: 'driver' | 'host') => void;
+  onRegister: (payload: {
+    role: 'driver' | 'host';
+    username: string;
+    email: string;
+    password: string;
+    vehicleModel?: string;
+    parkingType?: string;
+  }) => Promise<void>;
   onNavigateToLogin: () => void;
   notice?: string;
 }
@@ -10,20 +17,33 @@ interface RegisterPageProps {
 const RegisterPage = ({ onRegister, onNavigateToLogin, notice }: RegisterPageProps) => {
   const [role, setRole] = useState<'driver' | 'host'>('driver');
   const [isLoading, setIsLoading] = useState(false);
-  const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [vehicleModel, setVehicleModel] = useState('');
   const [parkingType, setParkingType] = useState('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setIsLoading(true);
+    setErrorMessage(null);
 
-    setTimeout(() => {
+    try {
+      await onRegister({
+        role,
+        username,
+        email,
+        password,
+        vehicleModel: role === 'driver' ? vehicleModel : undefined,
+        parkingType: role === 'host' ? parkingType : undefined,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to register. Please try again.';
+      setErrorMessage(message);
+    } finally {
       setIsLoading(false);
-      onRegister(role);
-    }, 1200);
+    }
   };
 
   return (
@@ -47,6 +67,7 @@ const RegisterPage = ({ onRegister, onNavigateToLogin, notice }: RegisterPagePro
             <button
               type="button"
               onClick={() => setRole('driver')}
+              disabled={isLoading}
               className={`flex flex-col items-center gap-2 rounded-2xl border-2 p-4 text-sm font-semibold transition ${
                 role === 'driver'
                   ? 'border-accent bg-accent-soft text-ink'
@@ -59,6 +80,7 @@ const RegisterPage = ({ onRegister, onNavigateToLogin, notice }: RegisterPagePro
             <button
               type="button"
               onClick={() => setRole('host')}
+              disabled={isLoading}
               className={`flex flex-col items-center gap-2 rounded-2xl border-2 p-4 text-sm font-semibold transition ${
                 role === 'host'
                   ? 'border-accent bg-accent-soft text-ink'
@@ -71,19 +93,24 @@ const RegisterPage = ({ onRegister, onNavigateToLogin, notice }: RegisterPagePro
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {errorMessage && (
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {errorMessage}
+              </div>
+            )}
             <div className="space-y-1">
-              <label className="text-xs font-semibold uppercase text-muted" htmlFor="register-name">
-                Full name
+              <label className="text-xs font-semibold uppercase text-muted" htmlFor="register-username">
+                Username
               </label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
                 <input
-                  id="register-name"
+                  id="register-username"
                   type="text"
                   required
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="John Doe"
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  placeholder="driverone"
                   className="w-full rounded-xl border border-border bg-surface px-10 py-3 text-sm text-ink shadow-soft"
                 />
               </div>
