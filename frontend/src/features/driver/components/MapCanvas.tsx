@@ -1,0 +1,166 @@
+import { useEffect, useRef } from 'react';
+import type { Map as LeafletMap, Marker } from 'leaflet';
+import { Crosshair } from 'lucide-react';
+import type { Station } from '@/types';
+import { StationStatus } from '@/types';
+import 'leaflet/dist/leaflet.css';
+
+interface MapCanvasProps {
+  stations: Station[];
+  selectedStationId?: string;
+  onSelectStation: (station: Station) => void;
+  onClearSelection: () => void;
+  userLocation: { lat: number; lng: number };
+}
+
+const MapCanvas = ({
+  stations,
+  selectedStationId,
+  onSelectStation,
+  onClearSelection,
+  userLocation,
+}: MapCanvasProps) => {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<LeafletMap | null>(null);
+  const markersRef = useRef<Marker[]>([]);
+  const leafletRef = useRef<typeof import('leaflet') | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const initializeMap = async () => {
+      if (!mapRef.current || mapInstanceRef.current) return;
+      const leaflet = await import('leaflet');
+      if (!isMounted || !mapRef.current) return;
+
+      leafletRef.current = leaflet;
+      const map = leaflet.map(mapRef.current, {
+        center: [userLocation.lat, userLocation.lng],
+        zoom: 12,
+        zoomControl: false,
+        attributionControl: false,
+      });
+
+      leaflet
+        .tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+          maxZoom: 20,
+        })
+        .addTo(map);
+
+      leaflet.control.zoom({ position: 'bottomright' }).addTo(map);
+
+      const userIcon = leaflet.divIcon({
+        className: 'user-location-marker',
+        html: `
+          <div class="relative flex items-center justify-center">
+            <div class="absolute inset-0 bg-sky-400 rounded-full animate-ping opacity-30 w-[36px] h-[36px] -ml-[8px] -mt-[8px]"></div>
+            <div class="relative w-4 h-4 rounded-full bg-sky-500 border-[3px] border-white shadow-lg"></div>
+          </div>
+        `,
+        iconSize: [20, 20],
+        iconAnchor: [10, 10],
+      });
+
+      leaflet.marker([userLocation.lat, userLocation.lng], { icon: userIcon, zIndexOffset: 1000 }).addTo(map);
+
+      map.on('click', () => onClearSelection());
+      mapInstanceRef.current = map;
+    };
+
+    void initializeMap();
+
+    return () => {
+      isMounted = false;
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, [onClearSelection, userLocation.lat, userLocation.lng]);
+
+  useEffect(() => {
+    if (!mapInstanceRef.current || !leafletRef.current) return;
+    const leaflet = leafletRef.current;
+
+    markersRef.current.forEach((marker) => marker.remove());
+    markersRef.current = [];
+
+    stations.forEach((station) => {
+      const isSelected = station.id === selectedStationId;
+      const iconHtml = `
+        <div class="relative flex items-center justify-center transition-all duration-300 ${
+          isSelected ? 'scale-125 z-50' : 'scale-100'
+        }">
+          ${
+            station.status === StationStatus.AVAILABLE
+              ? '<div class="absolute inset-0 bg-emerald-400 rounded-full animate-ping opacity-75 w-full h-full"></div>'
+              : ''
+          }
+          <div class="relative w-3.5 h-3.5 rounded-full border-2 border-white shadow-md ${
+            station.status === StationStatus.AVAILABLE
+              ? 'bg-emerald-500'
+              : station.status === StationStatus.BUSY
+                ? 'bg-rose-500'
+                : 'bg-slate-400'
+          }"></div>
+        </div>
+      `;
+
+      const icon = leaflet.divIcon({
+        className: 'leaflet-custom-marker',
+        html: iconHtml,
+        iconSize: [20, 20],
+        iconAnchor: [10, 10],
+      });
+
+      const marker = leaflet.marker([station.lat, station.lng], { icon });
+      marker.on('click', () => onSelectStation(station));
+      marker.addTo(mapInstanceRef.current!);
+      markersRef.current.push(marker);
+    });
+  }, [stations, selectedStationId, onSelectStation]);
+
+  useEffect(() => {
+    if (!mapInstanceRef.current || !selectedStationId) return;
+    const station = stations.find((item) => item.id === selectedStationId);
+    if (!station) return;
+    mapInstanceRef.current.flyTo([station.lat, station.lng], 15, { animate: true, duration: 1 });
+  }, [selectedStationId, stations]);
+
+  const handleRecenter = () => {
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.flyTo([userLocation.lat, userLocation.lng], 12);
+      onClearSelection();
+    }
+  };
+
+  return (
+    <div className="relative h-full w-full">
+      <div ref={mapRef} className="h-full w-full" />
+      <button
+        type="button"
+        onClick={handleRecenter}
+        className="absolute bottom-6 right-4 z-[400] rounded-full border border-border bg-surface-strong p-3 text-ink shadow-soft transition hover:scale-105"
+        aria-label="Recenter map"
+      >
+        <Crosshair size={20} />
+      </button>
+      <div className="absolute left-4 top-4 hidden items-center gap-3 rounded-2xl border border-border bg-surface/90 px-3 py-2 text-xs font-semibold text-muted backdrop-blur md:flex">
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-accent shadow-[0_0_0_2px_rgba(16,185,129,0.2)]" />
+          Available
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-danger" />
+          Busy
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-slate-400" />
+          Offline
+        </span>
+      </div>
+    </div>
+  );
+};
+
+export default MapCanvas;

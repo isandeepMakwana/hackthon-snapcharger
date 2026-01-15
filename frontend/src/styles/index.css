@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --ink: 15 23 42;
+    --muted: 71 85 105;
+    --surface: 248 250 252;
+    --surface-strong: 255 255 255;
+    --border: 226 232 240;
+    --accent: 16 185 129;
+    --accent-strong: 5 150 105;
+    --accent-soft: 209 250 229;
+    --warning: 251 191 36;
+    --danger: 248 113 113;
+    --info: 56 189 248;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-body text-ink bg-surface;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-display;
+  }
+
+  ::selection {
+    background: rgba(16, 185, 129, 0.2);
+  }
+
+  :focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2), 0 0 0 4px rgba(16, 185, 129, 0.35);
+  }
+}
+
+@layer components {
+  .app-background {
+    @apply relative overflow-hidden;
+  }
+
+  .app-background::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: theme('backgroundImage.app-gradient');
+    opacity: 0.9;
+    pointer-events: none;
+  }
+
+  .app-background::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: theme('backgroundImage.grid-fade');
+    background-size: 120px 120px;
+    opacity: 0.2;
+    pointer-events: none;
+  }
+
+  .app-content {
+    @apply relative z-10;
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(226, 232, 240, 0.7);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.9);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.9);
+}
+
+.leaflet-container {
+  height: 100%;
+}
+
+.leaflet-div-icon {
+  background: transparent;
+  border: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,4 +1,5 @@
-import { Station, StationStatus } from './types';
+import type { Station } from '@/types';
+import { StationStatus } from '@/types';
 
 export const MOCK_STATIONS: Station[] = [
   {
