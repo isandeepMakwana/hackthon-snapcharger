@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import { ArrowRight, Car, Home, Loader2, Lock, Mail, Zap } from 'lucide-react';
+import { ArrowRight, Loader2, Lock, Mail, Zap } from 'lucide-react';
 
 interface LoginPageProps {
   onLogin: (role: 'driver' | 'host') => void;
   onNavigateToRegister: () => void;
   notice?: string;
+  defaultRole?: 'driver' | 'host';
 }
 
-const LoginPage = ({ onLogin, onNavigateToRegister, notice }: LoginPageProps) => {
-  const [role, setRole] = useState<'driver' | 'host'>('driver');
+const LoginPage = ({ onLogin, onNavigateToRegister, notice, defaultRole }: LoginPageProps) => {
+  const role: 'driver' | 'host' = defaultRole ?? 'driver';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -43,32 +44,6 @@ const LoginPage = ({ onLogin, onNavigateToRegister, notice }: LoginPageProps) =>
           )}
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setRole('driver')}
-                className={`flex flex-col items-center gap-2 rounded-2xl border-2 p-3 text-sm font-semibold transition ${
-                  role === 'driver'
-                    ? 'border-accent bg-accent-soft text-ink'
-                    : 'border-border text-muted hover:border-accent/40'
-                }`}
-              >
-                <Car size={20} className={role === 'driver' ? 'text-accent' : 'text-muted'} />
-                Driver
-              </button>
-              <button
-                type="button"
-                onClick={() => setRole('host')}
-                className={`flex flex-col items-center gap-2 rounded-2xl border-2 p-3 text-sm font-semibold transition ${
-                  role === 'host'
-                    ? 'border-accent bg-accent-soft text-ink'
-                    : 'border-border text-muted hover:border-accent/40'
-                }`}
-              >
-                <Home size={20} className={role === 'host' ? 'text-accent' : 'text-muted'} />
-                Host
-              </button>
-            </div>
             <div className="space-y-1">
               <label className="text-xs font-semibold uppercase text-muted" htmlFor="login-email">
                 Email address
