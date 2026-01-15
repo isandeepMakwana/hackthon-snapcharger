@@ -31,6 +31,45 @@ const HostView = () => {
     setIsModalOpen(true);
   };
 
+  const handleSaveStation = async (stationData: Partial<Station>) => {
+    const apiBaseUrl =
+      (import.meta as any).env?.VITE_API_BASE_URL || (window as any).VITE_API_BASE_URL || 'http://localhost:8000';
+
+    const payload = {
+      hostName: stationData.hostName || 'Current User',
+      title: stationData.title || 'New Station',
+      location: stationData.location || 'Pune',
+      description: stationData.description || '',
+      connectorType: stationData.connectorType || 'Type 2',
+      powerOutput: stationData.powerOutput || '7.2kW',
+      pricePerHour: stationData.pricePerHour ?? 0,
+      image: stationData.image || '',
+      lat: stationData.lat ?? 18.5204,
+      lng: stationData.lng ?? 73.8567,
+      phoneNumber: stationData.phoneNumber,
+    };
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/host/stations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        saveStation(stationData);
+        return;
+      }
+
+      const saved = (await response.json()) as Station;
+      saveStation(saved);
+    } catch {
+      saveStation(stationData);
+    }
+  };
+
   return (
     <div className="flex h-[calc(100vh-64px)] flex-col overflow-y-auto bg-surface">
       <div className="px-4 pt-6 md:px-6">
@@ -96,7 +135,7 @@ const HostView = () => {
         <AddStationModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
-          onAddStation={saveStation}
+          onAddStation={handleSaveStation}
           initialData={editingStation}
         />
       </Suspense>

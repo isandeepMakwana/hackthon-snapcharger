@@ -37,6 +37,7 @@ const DriverView = ({
   onPendingBookingHandled,
 }: DriverViewProps) => {
   const stations = useStationStore((state) => state.stations);
+  const loadStations = useStationStore((state) => state.loadStations);
   const bookStation = useStationStore((state) => state.bookStation);
 
   const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
@@ -113,6 +114,35 @@ const DriverView = ({
     return true;
     });
   }, [stations, statusFilter, activeTags, searchQuery]);
+
+  useEffect(() => {
+    const apiBaseUrl =
+      (import.meta as any).env?.VITE_API_BASE_URL || (window as any).VITE_API_BASE_URL || 'http://localhost:8000';
+    const controller = new AbortController();
+
+    const fetchStations = async () => {
+      try {
+        const params = new URLSearchParams({
+          lat: String(USER_LOCATION.lat),
+          lng: String(USER_LOCATION.lng),
+          radius_km: '10',
+        });
+        const response = await fetch(`${apiBaseUrl}/api/driver/search?${params.toString()}`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        loadStations(data as Station[]);
+      } catch {
+      }
+    };
+
+    fetchStations();
+
+    return () => {
+      controller.abort();
+    };
+  }, [loadStations]);
 
   useEffect(() => {
     if (!selectedStationId) return;

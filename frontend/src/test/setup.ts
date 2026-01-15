@@ -29,3 +29,11 @@ Object.defineProperty(globalThis, 'ResizeObserver', {
   value: ResizeObserverMock,
   writable: true,
 });
+
+if (!(globalThis as any).fetch) {
+  (globalThis as any).fetch = () =>
+    Promise.resolve({
+      ok: false,
+      json: () => Promise.resolve({}),
+    } as Response);
+}

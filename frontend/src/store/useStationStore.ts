@@ -10,6 +10,7 @@ type StationStore = {
   stations: Station[];
   hostStats: HostStats;
   setViewMode: (mode: ViewMode) => void;
+  loadStations: (stations: Station[]) => void;
   saveStation: (stationData: Partial<Station>) => void;
   bookStation: (id: string) => void;
   toggleStationStatus: (id: string) => void;
@@ -47,6 +48,10 @@ const initialState = {
 export const useStationStore = create<StationStore>((set) => ({
   ...initialState,
   setViewMode: (mode) => set({ viewMode: mode }),
+  loadStations: (stations) =>
+    set((state) => ({
+      stations: stations.length > 0 ? stations : state.stations,
+    })),
   saveStation: (stationData) =>
     set((state) => {
       if (stationData.id) {
