@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { ArrowRight, Car, Home, Loader2, Lock, Mail, Zap } from 'lucide-react';
+import { ArrowRight, Loader2, Lock, Mail, Zap } from 'lucide-react';
 
 interface LoginPageProps {
   onLogin: (payload: { role: 'driver' | 'host'; email: string; password: string }) => Promise<void>;
   onForgotPassword?: (email: string) => Promise<void>;
   onNavigateToRegister: () => void;
   notice?: string;
+  defaultRole?: 'driver' | 'host';
 }
 
 const LoginPage = ({ onLogin, onForgotPassword, onNavigateToRegister, notice }: LoginPageProps) => {
