@@ -61,9 +61,27 @@ const DriverView = ({
   const [activeSection, setActiveSection] = useState<'discover' | 'bookings'>('discover');
   const [searchRadius, setSearchRadius] = useState(10);
 
+  const getStationKey = useCallback((station: Station) => {
+    const title = station.title.trim().toLowerCase();
+    const location = station.location.trim().toLowerCase();
+    return `${title}|${location}|${station.lat.toFixed(5)}|${station.lng.toFixed(5)}`;
+  }, []);
+
+  const uniqueStations = useMemo(() => {
+    const seen = new Set<string>();
+    const result: Station[] = [];
+    stations.forEach((station) => {
+      const key = getStationKey(station);
+      if (seen.has(key)) return;
+      seen.add(key);
+      result.push(station);
+    });
+    return result;
+  }, [stations, getStationKey]);
+
   const selectedStation = useMemo(
-    () => stations.find((station) => station.id === selectedStationId) || null,
-    [stations, selectedStationId]
+    () => uniqueStations.find((station) => station.id === selectedStationId) || null,
+    [uniqueStations, selectedStationId]
   );
   const availableSlots = useMemo(() => {
     if (selectedStation?.availableTimeSlots && selectedStation.availableTimeSlots.length > 0) {
@@ -158,9 +176,9 @@ const DriverView = ({
   }, [selectedStationId]);
 
   useEffect(() => {
-    if ((!stationId && !stationSlug) || stations.length === 0) return;
+    if ((!stationId && !stationSlug) || uniqueStations.length === 0) return;
     const matchById = stationId
-      ? stations.find((station) => station.id === stationId)
+      ? uniqueStations.find((station) => station.id === stationId)
       : undefined;
     let match = matchById;
 
@@ -174,7 +192,7 @@ const DriverView = ({
         return;
       }
       const normalizedSlug = normalizeStationSlug(decodedSlug);
-      match = stations.find(
+      match = uniqueStations.find(
         (station) => normalizeStationSlug(station.title) === normalizedSlug
       );
     }
@@ -185,7 +203,19 @@ const DriverView = ({
       setSelectedStationId(null);
       navigate('/', { replace: true });
     }
-  }, [stationId, stationSlug, stations, normalizeStationSlug, navigate]);
+  }, [stationId, stationSlug, uniqueStations, normalizeStationSlug, navigate]);
+
+  useEffect(() => {
+    if (!selectedStationId) return;
+    if (uniqueStations.some((station) => station.id === selectedStationId)) return;
+    const candidate = stations.find((station) => station.id === selectedStationId);
+    if (!candidate) return;
+    const key = getStationKey(candidate);
+    const canonical = uniqueStations.find((station) => getStationKey(station) === key);
+    if (canonical && canonical.id !== selectedStationId) {
+      setSelectedStationId(canonical.id);
+    }
+  }, [selectedStationId, stations, uniqueStations, getStationKey]);
 
   useEffect(() => {
     if (!showBookingConfirm) return;
@@ -230,9 +260,9 @@ const DriverView = ({
 
   useEffect(() => {
     if (!selectedStationId) return;
-    const stillVisible = stations.some((station) => station.id === selectedStationId);
+    const stillVisible = uniqueStations.some((station) => station.id === selectedStationId);
     if (!stillVisible) setSelectedStationId(null);
-  }, [stations, selectedStationId]);
+  }, [uniqueStations, selectedStationId]);
 
   const initiateBooking = () => {
     if (!selectedStation || selectedStation.status !== StationStatus.AVAILABLE) return;
@@ -285,7 +315,7 @@ const DriverView = ({
       onRequireDriverProfile();
       return;
     }
-    const station = stations.find((item) => item.id === pendingBookingStationId);
+    const station = uniqueStations.find((item) => item.id === pendingBookingStationId);
     if (station) {
       setSelectedStationId(station.id);
       setShowBookingConfirm(true);
@@ -294,7 +324,7 @@ const DriverView = ({
   }, [
     isLoggedIn,
     pendingBookingStationId,
-    stations,
+    uniqueStations,
     onPendingBookingHandled,
     driverProfileComplete,
     onRequireDriverProfile
@@ -474,7 +504,7 @@ const DriverView = ({
                 />
               </div>
               <div className="mt-3 flex items-center justify-between text-xs text-muted">
-                <span>{stations.length} stations</span>
+                <span>{uniqueStations.length} stations</span>
                 {driverConfig?.personalizedLabel && (
                   <span className="flex items-center gap-1">
                     <Filter size={12} /> {driverConfig.personalizedLabel}
@@ -484,13 +514,13 @@ const DriverView = ({
             </div>
 
             <div className="flex-1 space-y-4 overflow-y-auto bg-surface px-4 py-4">
-              {stations.length === 0 ? (
+              {uniqueStations.length === 0 ? (
                 <div className="flex h-48 flex-col items-center justify-center text-muted">
                   <Filter size={28} className="mb-2 opacity-60" />
                   <p className="text-sm">No stations found for these filters.</p>
                 </div>
               ) : (
-                stations.map((station, index) => (
+                uniqueStations.map((station, index) => (
                   <Link
                     key={station.id}
                     to={`/stations/${getStationSlug(station)}`}
@@ -517,7 +547,7 @@ const DriverView = ({
           <div className="relative z-0 isolate order-1 h-[45%] w-full bg-slate-200 md:order-2 md:h-full md:w-7/12 lg:w-8/12">
             {driverConfig && (
               <MapCanvas
-                stations={stations}
+                stations={uniqueStations}
                 selectedStationId={selectedStationId ?? undefined}
                 onSelectStation={handleSelectStation}
                 onClearSelection={handleClearSelection}
