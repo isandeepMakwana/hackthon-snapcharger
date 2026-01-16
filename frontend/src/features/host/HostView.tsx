@@ -86,6 +86,7 @@ const HostView = () => {
       lat: stationData.lat ?? 18.5204,
       lng: stationData.lng ?? 73.8567,
       phoneNumber: stationData.phoneNumber,
+      supportedVehicleTypes: stationData.supportedVehicleTypes ?? ['2W', '4W'],
     };
 
     try {

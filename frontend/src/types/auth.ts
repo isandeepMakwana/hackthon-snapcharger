@@ -1,10 +1,12 @@
-export type AuthRole = 'driver' | 'host' | 'admin';
+export type AuthRole = 'member' | 'admin' | 'driver' | 'host';
 
 export interface AuthUser {
   id: string;
   username: string;
   email: string;
   phoneNumber?: string;
+  driverProfileComplete?: boolean;
+  hostProfileComplete?: boolean;
   role: AuthRole;
   permissions: string[];
   emailVerified: boolean;

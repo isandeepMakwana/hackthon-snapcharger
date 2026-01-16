@@ -30,6 +30,7 @@ const AddStationModal = ({
     connectorType: '',
     powerOutput: '',
     pricePerHour: '150',
+    supportedVehicleTypes: ['2W', '4W'] as Array<'2W' | '4W'>,
   });
 
   useEffect(() => {
@@ -49,6 +50,7 @@ const AddStationModal = ({
         connectorType: initialData.connectorType,
         powerOutput: initialData.powerOutput,
         pricePerHour: String(initialData.pricePerHour),
+        supportedVehicleTypes: (initialData.supportedVehicleTypes as Array<'2W' | '4W'>) ?? ['2W', '4W'],
       });
       setSelectedImage(initialData.image);
       setStep('review');
@@ -60,6 +62,7 @@ const AddStationModal = ({
         connectorType: '',
         powerOutput: '',
         pricePerHour: '150',
+        supportedVehicleTypes: ['2W', '4W'],
       });
       setSelectedImage(null);
       setAnalysisData(null);
@@ -153,8 +156,18 @@ const AddStationModal = ({
       powerOutput: formData.powerOutput,
       pricePerHour: Number(formData.pricePerHour),
       image: selectedImage || '',
+      supportedVehicleTypes: formData.supportedVehicleTypes,
     });
     onClose();
+  };
+
+  const toggleVehicleType = (value: '2W' | '4W') => {
+    setFormData((prev) => {
+      const next = prev.supportedVehicleTypes.includes(value)
+        ? prev.supportedVehicleTypes.filter((item) => item !== value)
+        : [...prev.supportedVehicleTypes, value];
+      return { ...prev, supportedVehicleTypes: next.length ? next : prev.supportedVehicleTypes };
+    });
   };
 
   const getConfidenceLevel = (score: number) => {
@@ -332,6 +345,26 @@ const AddStationModal = ({
                   onChange={(event) => setFormData({ ...formData, pricePerHour: event.target.value })}
                   className="mt-1 w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm font-semibold"
                 />
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase text-muted">Supported vehicles</p>
+                <div className="mt-2 flex gap-2">
+                  {(['2W', '4W'] as const).map((value) => (
+                    <button
+                      type="button"
+                      key={value}
+                      onClick={() => toggleVehicleType(value)}
+                      className={`flex-1 rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                        formData.supportedVehicleTypes.includes(value)
+                          ? 'border-accent bg-accent-soft text-ink'
+                          : 'border-border text-muted hover:text-ink'
+                      }`}
+                    >
+                      {value === '2W' ? '2 Wheeler' : '4 Wheeler'}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {selectedImage && (

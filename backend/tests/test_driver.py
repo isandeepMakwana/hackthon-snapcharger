@@ -3,18 +3,38 @@ def register_user(client, role: str, overrides=None):
         'username': f'{role}user',
         'email': f'{role}@example.com',
         'password': 'Password123!',
-        'phoneNumber': '+919811112277',
-        'role': role
+        'phoneNumber': '+919811112277'
     }
     if overrides:
         payload.update(overrides)
     return client.post('/api/auth/register', json=payload)
 
 
-def auth_headers_for_role(client, role: str):
+def create_driver_profile(client, headers):
+    response = client.put('/api/profile/driver', json={
+        'vehicleType': '4W',
+        'vehicleModel': 'Tata Nexon EV'
+    }, headers=headers)
+    assert response.status_code == 200
+
+
+def create_host_profile(client, headers):
+    response = client.put('/api/profile/host', json={
+        'parkingType': 'covered',
+        'parkingAddress': 'Pune'
+    }, headers=headers)
+    assert response.status_code == 200
+
+
+def auth_headers_for_role(client, role: str, with_profile: bool = True):
     response = register_user(client, role)
     access_token = response.json()['tokens']['accessToken']
-    return {'Authorization': f'Bearer {access_token}'}
+    headers = {'Authorization': f'Bearer {access_token}'}
+    if with_profile and role == 'driver':
+        create_driver_profile(client, headers)
+    if with_profile and role == 'host':
+        create_host_profile(client, headers)
+    return headers
 
 
 def create_station_for_host(client, headers, overrides=None):
@@ -29,7 +49,8 @@ def create_station_for_host(client, headers, overrides=None):
         'lat': 18.5204,
         'lng': 73.8567,
         'status': 'AVAILABLE',
-        'monthlyEarnings': 1000
+        'monthlyEarnings': 1000,
+        'supportedVehicleTypes': ['2W', '4W']
     }
     if overrides:
         payload.update(overrides)
@@ -55,35 +76,69 @@ def test_driver_booking_updates_station(client):
 
     booking_response = client.post(
         '/api/driver/bookings',
-        json={'stationId': station['id'], 'userLat': 18.5204, 'userLng': 73.8567},
+        json={
+            'stationId': station['id'],
+            'startTime': '10:00 AM',
+            'userLat': 18.5204,
+            'userLng': 73.8567
+        },
         headers=headers
     )
     assert booking_response.status_code == 200
-    assert booking_response.json()['status'] == 'BUSY'
+    assert booking_response.json()['status'] == 'AVAILABLE'
 
     search_response = client.get('/api/driver/search', params={'lat': 18.5204, 'lng': 73.8567, 'radius_km': 10})
     assert search_response.status_code == 200
-    assert search_response.json()[0]['status'] == 'BUSY'
+    assert search_response.json()[0]['status'] == 'AVAILABLE'
 
 
 def test_driver_booking_rejects_unavailable_station(client):
     host_headers = auth_headers_for_role(client, 'host')
+    station = create_station_for_host(client, host_headers, {'status': 'OFFLINE'})
+    headers = auth_headers_for_role(client, 'driver')
+
+    response = client.post(
+        '/api/driver/bookings',
+        json={'stationId': station['id'], 'startTime': '10:00 AM'},
+        headers=headers
+    )
+    assert response.status_code == 400
+    assert response.json()['error']['code'] == 'UNAVAILABLE'
+
+
+def test_driver_booking_rejects_time_slot_conflict(client):
+    host_headers = auth_headers_for_role(client, 'host')
     station = create_station_for_host(client, host_headers)
     headers = auth_headers_for_role(client, 'driver')
 
-    client.post(
+    first_response = client.post(
         '/api/driver/bookings',
-        json={'stationId': station['id']},
+        json={'stationId': station['id'], 'startTime': '10:00 AM'},
         headers=headers
     )
+    assert first_response.status_code == 200
 
     second_response = client.post(
         '/api/driver/bookings',
-        json={'stationId': station['id']},
+        json={'stationId': station['id'], 'startTime': '10:00 AM'},
         headers=headers
     )
-    assert second_response.status_code == 400
-    assert second_response.json()['error']['code'] == 'UNAVAILABLE'
+    assert second_response.status_code == 409
+    assert second_response.json()['error']['code'] == 'TIME_SLOT_UNAVAILABLE'
+
+
+def test_driver_booking_requires_profile(client):
+    host_headers = auth_headers_for_role(client, 'host')
+    station = create_station_for_host(client, host_headers)
+    headers = auth_headers_for_role(client, 'driver', with_profile=False)
+
+    booking_response = client.post(
+        '/api/driver/bookings',
+        json={'stationId': station['id'], 'startTime': '10:00 AM'},
+        headers=headers
+    )
+    assert booking_response.status_code == 403
+    assert booking_response.json()['error']['code'] == 'PROFILE_INCOMPLETE'
 
 
 def test_driver_config(client):
@@ -95,6 +150,7 @@ def test_driver_config(client):
     assert payload['searchRadiusKm'] > 0
     assert len(payload['filterTags']) > 0
     assert len(payload['statusOptions']) > 0
+    assert len(payload['vehicleTypeOptions']) > 0
     assert len(payload['booking']['timeSlots']) > 0
 
 
@@ -103,12 +159,14 @@ def test_driver_search_filters(client):
     create_station_for_host(client, headers, {
         'title': 'Fast Charger',
         'powerOutput': '22kW',
-        'pricePerHour': 300
+        'pricePerHour': 300,
+        'supportedVehicleTypes': ['4W']
     })
     create_station_for_host(client, headers, {
         'title': 'Budget Charger',
         'powerOutput': '7.2kW',
-        'pricePerHour': 150
+        'pricePerHour': 150,
+        'supportedVehicleTypes': ['2W']
     })
 
     fast_response = client.get('/api/driver/search', params={
@@ -128,3 +186,12 @@ def test_driver_search_filters(client):
     })
     assert budget_response.status_code == 200
     assert budget_response.json()[0]['title'] == 'Budget Charger'
+
+    two_wheeler_response = client.get('/api/driver/search', params={
+        'lat': 18.5204,
+        'lng': 73.8567,
+        'radius_km': 10,
+        'vehicle_type': '2W'
+    })
+    assert two_wheeler_response.status_code == 200
+    assert two_wheeler_response.json()[0]['title'] == 'Budget Charger'

@@ -3,8 +3,19 @@ def register_host(client, overrides=None):
         'username': 'hostone',
         'email': 'host@example.com',
         'password': 'Password123!',
-        'phoneNumber': '+919811112255',
-        'role': 'host'
+        'phoneNumber': '+919811112255'
+    }
+    if overrides:
+        payload.update(overrides)
+    return client.post('/api/auth/register', json=payload)
+
+
+def register_driver(client, overrides=None):
+    payload = {
+        'username': 'driverone',
+        'email': 'driver@example.com',
+        'password': 'Password123!',
+        'phoneNumber': '+919811112266'
     }
     if overrides:
         payload.update(overrides)
@@ -27,7 +38,25 @@ def register_driver(client, overrides=None):
 def auth_headers(client):
     response = register_host(client)
     access_token = response.json()['tokens']['accessToken']
-    return {'Authorization': f'Bearer {access_token}'}
+    headers = {'Authorization': f'Bearer {access_token}'}
+    profile_response = client.put('/api/profile/host', json={
+        'parkingType': 'covered',
+        'parkingAddress': 'Pune'
+    }, headers=headers)
+    assert profile_response.status_code == 200
+    return headers
+
+
+def auth_headers_for_driver(client):
+    response = register_driver(client)
+    access_token = response.json()['tokens']['accessToken']
+    headers = {'Authorization': f'Bearer {access_token}'}
+    profile_response = client.put('/api/profile/driver', json={
+        'vehicleType': '4W',
+        'vehicleModel': 'Tata Nexon EV'
+    }, headers=headers)
+    assert profile_response.status_code == 200
+    return headers
 
 
 def auth_headers_for_driver(client):
@@ -88,6 +117,15 @@ def test_host_station_crud_and_stats(client):
     assert stats_after.status_code == 200
     assert stats_after.json()['activeBookings'] == 0
     assert stats_after.json()['stationHealth'] == 0
+
+
+def test_host_requires_profile(client):
+    response = register_host(client)
+    headers = {'Authorization': f\"Bearer {response.json()['tokens']['accessToken']}\"}
+
+    stats_response = client.get('/api/host/stats', headers=headers)
+    assert stats_response.status_code == 403
+    assert stats_response.json()['error']['code'] == 'PROFILE_INCOMPLETE'
 
 
 def test_host_analyze_photo(client):

@@ -1,29 +1,23 @@
 import { useState } from 'react';
-import { ArrowRight, Car, Home, Loader2, Lock, Mail, Phone, User, Zap } from 'lucide-react';
+import { ArrowRight, Loader2, Lock, Mail, Phone, User, Zap } from 'lucide-react';
 
 interface RegisterPageProps {
   onRegister: (payload: {
-    role: 'driver' | 'host';
     username: string;
     email: string;
     phoneNumber: string;
     password: string;
-    vehicleModel?: string;
-    parkingType?: string;
   }) => Promise<void>;
   onNavigateToLogin: () => void;
   notice?: string;
 }
 
 const RegisterPage = ({ onRegister, onNavigateToLogin, notice }: RegisterPageProps) => {
-  const [role, setRole] = useState<'driver' | 'host'>('driver');
   const [isLoading, setIsLoading] = useState(false);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
-  const [vehicleModel, setVehicleModel] = useState('');
-  const [parkingType, setParkingType] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -33,13 +27,10 @@ const RegisterPage = ({ onRegister, onNavigateToLogin, notice }: RegisterPagePro
 
     try {
       await onRegister({
-        role,
         username,
         email,
         phoneNumber,
         password,
-        vehicleModel: role === 'driver' ? vehicleModel : undefined,
-        parkingType: role === 'host' ? parkingType : undefined,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to register. Please try again.';
@@ -65,35 +56,6 @@ const RegisterPage = ({ onRegister, onNavigateToLogin, notice }: RegisterPagePro
               {notice}
             </div>
           )}
-
-          <div className="mb-6 grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => setRole('driver')}
-              disabled={isLoading}
-              className={`flex flex-col items-center gap-2 rounded-2xl border-2 p-4 text-sm font-semibold transition ${
-                role === 'driver'
-                  ? 'border-accent bg-accent-soft text-ink'
-                  : 'border-border text-muted hover:border-accent/40'
-              }`}
-            >
-              <Car size={22} className={role === 'driver' ? 'text-accent' : 'text-muted'} />
-              I'm a Driver
-            </button>
-            <button
-              type="button"
-              onClick={() => setRole('host')}
-              disabled={isLoading}
-              className={`flex flex-col items-center gap-2 rounded-2xl border-2 p-4 text-sm font-semibold transition ${
-                role === 'host'
-                  ? 'border-accent bg-accent-soft text-ink'
-                  : 'border-border text-muted hover:border-accent/40'
-              }`}
-            >
-              <Home size={22} className={role === 'host' ? 'text-accent' : 'text-muted'} />
-              I'm a Host
-            </button>
-          </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {errorMessage && (
@@ -172,41 +134,6 @@ const RegisterPage = ({ onRegister, onNavigateToLogin, notice }: RegisterPagePro
                 />
               </div>
             </div>
-
-            {role === 'driver' ? (
-              <div className="space-y-1">
-                <label className="text-xs font-semibold uppercase text-muted" htmlFor="vehicle-model">
-                  Vehicle model
-                </label>
-                <input
-                  id="vehicle-model"
-                  type="text"
-                  required
-                  value={vehicleModel}
-                  onChange={(event) => setVehicleModel(event.target.value)}
-                  placeholder="e.g. Tata Nexon EV"
-                  className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-ink shadow-soft"
-                />
-              </div>
-            ) : (
-              <div className="space-y-1">
-                <label className="text-xs font-semibold uppercase text-muted" htmlFor="parking-type">
-                  Parking type
-                </label>
-                <select
-                  id="parking-type"
-                  required
-                  value={parkingType}
-                  onChange={(event) => setParkingType(event.target.value)}
-                  className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-ink shadow-soft"
-                >
-                  <option value="">Select a type</option>
-                  <option value="covered">Covered parking</option>
-                  <option value="open">Open parking</option>
-                  <option value="shared">Shared driveway</option>
-                </select>
-              </div>
-            )}
 
             <button
               type="submit"

@@ -34,8 +34,8 @@ async def create_user(
     admin_user: User = Depends(require_role('admin')),
     db: Session = Depends(get_db)
 ) -> UserOut:
-    role = payload.role or 'driver'
-    if role not in {'driver', 'host', 'admin'}:
+    role = payload.role or 'member'
+    if role not in {'member', 'driver', 'host', 'admin'}:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={'code': 'VALIDATION_ERROR', 'message': 'Invalid role.'}
@@ -134,7 +134,7 @@ async def update_user(
         user.phone_number = updates['phone_number'].strip() if updates['phone_number'] else None
 
     if 'role' in updates:
-        if updates['role'] not in {'driver', 'host', 'admin'}:
+        if updates['role'] not in {'member', 'driver', 'host', 'admin'}:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={'code': 'VALIDATION_ERROR', 'message': 'Invalid role.'}

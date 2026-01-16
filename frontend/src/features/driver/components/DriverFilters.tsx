@@ -3,24 +3,30 @@ import { Filter } from 'lucide-react';
 interface DriverFiltersProps {
   statusFilter: string;
   setStatusFilter: (value: string) => void;
+  vehicleType: string;
+  setVehicleType: (value: string) => void;
   activeTags: string[];
   toggleTag: (tag: string) => void;
   searchQuery: string;
   setSearchQuery: (value: string) => void;
   filterTags: { id: string; label: string }[];
   statusOptions: { value: string; label: string }[];
+  vehicleTypeOptions: { value: string; label: string }[];
   searchPlaceholder: string;
 }
 
 const DriverFilters = ({
   statusFilter,
   setStatusFilter,
+  vehicleType,
+  setVehicleType,
   activeTags,
   toggleTag,
   searchQuery,
   setSearchQuery,
   filterTags,
   statusOptions,
+  vehicleTypeOptions,
   searchPlaceholder,
 }: DriverFiltersProps) => {
   return (
@@ -53,6 +59,21 @@ const DriverFilters = ({
           className="rounded-full border border-border bg-surface px-3 py-2 text-xs font-semibold text-ink"
         >
           {statusOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <label htmlFor="vehicle-filter" className="sr-only">
+          Filter by vehicle type
+        </label>
+        <select
+          id="vehicle-filter"
+          value={vehicleType}
+          onChange={(event) => setVehicleType(event.target.value)}
+          className="rounded-full border border-border bg-surface px-3 py-2 text-xs font-semibold text-ink"
+        >
+          {vehicleTypeOptions.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>

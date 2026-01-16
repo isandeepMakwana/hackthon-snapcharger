@@ -8,7 +8,7 @@ class UserBase(CamelModel):
     username: str = Field(min_length=3, max_length=50)
     email: EmailStr
     phone_number: str = Field(min_length=7, max_length=30)
-    role: str = 'driver'
+    role: str = 'member'
     permissions: List[str] = Field(default_factory=list)
 
 
@@ -17,7 +17,7 @@ class UserCreate(CamelModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     phone_number: str = Field(min_length=7, max_length=30)
-    role: Optional[str] = 'driver'
+    role: Optional[str] = 'member'
     permissions: List[str] = Field(default_factory=list)
 
 
@@ -38,6 +38,8 @@ class UserOut(CamelModel):
     role: str
     permissions: List[str]
     email_verified: bool
+    driver_profile_complete: bool | None = None
+    host_profile_complete: bool | None = None
     created_at: datetime
     updated_at: datetime
 

@@ -26,6 +26,7 @@ DEMO_STATIONS = [
         'lat': 18.5362,
         'lng': 73.8940,
         'phone_number': '+919876543210',
+        'supported_vehicle_types': ['2W', '4W'],
         'monthly_earnings': 3200
     },
     {
@@ -42,6 +43,7 @@ DEMO_STATIONS = [
         'lat': 18.5913,
         'lng': 73.7389,
         'phone_number': '+919876543211',
+        'supported_vehicle_types': ['2W', '4W'],
         'monthly_earnings': 4100
     },
     {
@@ -58,6 +60,7 @@ DEMO_STATIONS = [
         'lat': 18.5590,
         'lng': 73.7868,
         'phone_number': '+919876543212',
+        'supported_vehicle_types': ['2W', '4W'],
         'monthly_earnings': 2100
     },
     {
@@ -74,6 +77,7 @@ DEMO_STATIONS = [
         'lat': 18.5196,
         'lng': 73.8433,
         'phone_number': '+919876543213',
+        'supported_vehicle_types': ['2W', '4W'],
         'monthly_earnings': 0
     },
     {
@@ -90,6 +94,7 @@ DEMO_STATIONS = [
         'lat': 18.5679,
         'lng': 73.9143,
         'phone_number': '+919876543214',
+        'supported_vehicle_types': ['2W', '4W'],
         'monthly_earnings': 3050
     }
 ]

@@ -16,6 +16,11 @@ export interface DriverStatusOption {
   label: string;
 }
 
+export interface DriverVehicleTypeOption {
+  value: string;
+  label: string;
+}
+
 export interface DriverLegendItem {
   status: StationStatus | string;
   label: string;
@@ -35,6 +40,7 @@ export interface DriverConfig {
   searchPlaceholder: string;
   filterTags: DriverFilterTag[];
   statusOptions: DriverStatusOption[];
+  vehicleTypeOptions: DriverVehicleTypeOption[];
   legend: DriverLegendItem[];
   booking: DriverBookingConfig;
 }

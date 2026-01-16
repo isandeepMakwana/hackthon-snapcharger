@@ -27,6 +27,8 @@ export interface Station {
   lng: number; // Real Map Longitude
   distance: string;
   phoneNumber?: string; // New field for Call feature
+  supportedVehicleTypes?: string[];
+  bookedTimeSlots?: string[];
 }
 
 export interface HostStats {

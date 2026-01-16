@@ -31,6 +31,11 @@ class DriverLegendItem(CamelModel):
     label: str
 
 
+class DriverVehicleTypeOption(CamelModel):
+    value: str
+    label: str
+
+
 class BookingConfig(CamelModel):
     service_fee: int = Field(ge=0)
     time_slots: list[str]
@@ -45,5 +50,6 @@ class DriverConfig(CamelModel):
     search_placeholder: str
     filter_tags: list[DriverFilterTag]
     status_options: list[DriverStatusOption]
+    vehicle_type_options: list[DriverVehicleTypeOption]
     legend: list[DriverLegendItem]
     booking: BookingConfig

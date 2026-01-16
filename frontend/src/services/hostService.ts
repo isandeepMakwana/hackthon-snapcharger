@@ -23,14 +23,22 @@ const getAuthHeaders = () => {
   return { Authorization: `Bearer ${session.accessToken}` };
 };
 
+const normalizeHeaders = (headers?: HeadersInit) => {
+  if (!headers) return {};
+  if (headers instanceof Headers) return Object.fromEntries(headers.entries());
+  if (Array.isArray(headers)) return Object.fromEntries(headers);
+  return headers;
+};
+
 const requestJson = async <T>(path: string, options: RequestInit = {}): Promise<T> => {
+  const { headers, ...rest } = options;
   const response = await fetch(`${getApiBaseUrl()}${path}`, {
     headers: {
       'Content-Type': 'application/json',
       ...getAuthHeaders(),
-      ...(options.headers || {})
+      ...normalizeHeaders(headers)
     },
-    ...options
+    ...rest
   });
 
   let data: any = null;

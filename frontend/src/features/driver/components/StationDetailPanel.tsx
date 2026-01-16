@@ -47,6 +47,10 @@ const StationDetailPanel = ({
   isLoggedIn,
   serviceFee,
 }: StationDetailPanelProps) => {
+  const bookedSlots = station.bookedTimeSlots ?? [];
+  const isSelectedSlotBooked = selectedTimeSlot ? bookedSlots.includes(selectedTimeSlot) : false;
+  const canBook = station.status === StationStatus.AVAILABLE && !isSelectedSlotBooked && selectedTimeSlot !== '';
+
   return (
     <div className="absolute bottom-0 right-0 z-[500] flex h-[85vh] w-full animate-in slide-in-from-bottom-10 flex-col justify-end bg-surface-strong shadow-2xl md:top-0 md:h-full md:w-[380px] md:animate-in md:slide-in-from-right-10">
       <div className="relative flex h-full flex-col overflow-y-auto">
@@ -96,20 +100,26 @@ const StationDetailPanel = ({
                 <Clock size={12} /> Select Start Time
               </p>
               <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-                {availableSlots.map((slot) => (
-                  <button
-                    type="button"
-                    key={slot}
-                    onClick={() => onTimeSlotChange(slot)}
-                    className={`whitespace-nowrap rounded-full border px-3 py-2 text-xs font-semibold transition ${
-                      selectedTimeSlot === slot
-                        ? 'border-accent bg-accent text-white'
-                        : 'border-border bg-surface-strong text-muted hover:text-ink'
-                    }`}
-                  >
-                    {slot}
-                  </button>
-                ))}
+                {availableSlots.map((slot) => {
+                  const isBooked = bookedSlots.includes(slot);
+                  return (
+                    <button
+                      type="button"
+                      key={slot}
+                      onClick={() => onTimeSlotChange(slot)}
+                      disabled={isBooked}
+                      className={`whitespace-nowrap rounded-full border px-3 py-2 text-xs font-semibold transition ${
+                        isBooked
+                          ? 'cursor-not-allowed border-border bg-slate-100 text-slate-400'
+                          : selectedTimeSlot === slot
+                            ? 'border-accent bg-accent text-white'
+                            : 'border-border bg-surface-strong text-muted hover:text-ink'
+                      }`}
+                    >
+                      {slot}{isBooked ? ' • Booked' : ''}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -117,20 +127,22 @@ const StationDetailPanel = ({
           <button
             type="button"
             onClick={onBook}
-            disabled={station.status !== StationStatus.AVAILABLE}
+            disabled={!canBook}
             className={`mb-6 flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold shadow-soft transition ${
-              station.status === StationStatus.AVAILABLE
+              canBook
                 ? 'bg-accent text-white hover:bg-accent-strong'
                 : 'cursor-not-allowed bg-slate-100 text-slate-400'
             }`}
           >
-            {station.status === StationStatus.AVAILABLE ? (
+            {canBook ? (
               <>
                 <Zap size={18} /> {isLoggedIn ? `Book for ${selectedTimeSlot}` : 'Login to book'}
               </>
             ) : (
               <>
-                <AlertCircle size={18} /> Station {station.status === StationStatus.BUSY ? 'Occupied' : 'Unavailable'}
+                <AlertCircle size={18} /> {station.status === StationStatus.AVAILABLE
+                  ? 'Select a time slot'
+                  : `Station ${station.status === StationStatus.BUSY ? 'Occupied' : 'Unavailable'}`}
               </>
             )}
           </button>
