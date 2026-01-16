@@ -1,4 +1,4 @@
-import { ChevronDown, LogOut, MapPin, Menu, User, Zap } from 'lucide-react';
+import { ChevronDown, LogOut, MapPin, Menu, User, Zap, UserCog } from 'lucide-react';
 import { INITIAL_USER_AVATAR } from '@/data/mockStations';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
@@ -8,6 +8,7 @@ interface NavbarProps {
   isAuthenticated: boolean;
   onLoginClick: () => void;
   onLogout: () => void;
+  onEditProfile: () => void;
   authRole: string | null;
   locationLabel?: string;
 }
@@ -17,6 +18,7 @@ const Navbar = ({
   isAuthenticated,
   onLoginClick,
   onLogout,
+  onEditProfile,
   authRole,
   locationLabel,
 }: NavbarProps) => {
@@ -86,6 +88,17 @@ const Navbar = ({
                       Role: {authRole === 'admin' ? 'Admin' : 'Member'}
                     </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMenu(false);
+                      onEditProfile();
+                    }}
+                    className="flex w-full items-center gap-2 px-4 py-2 text-sm font-semibold text-ink transition hover:bg-surface"
+                    role="menuitem"
+                  >
+                    <UserCog size={16} /> Edit Profile
+                  </button>
                   <button
                     type="button"
                     onClick={() => {

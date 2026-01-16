@@ -94,6 +94,24 @@ export const fetchProfile = async (accessToken: string): Promise<AuthUser> => {
   });
 };
 
+export const updateProfile = async (
+  accessToken: string,
+  updates: {
+    username?: string;
+    email?: string;
+    phoneNumber?: string;
+    password?: string;
+  }
+): Promise<AuthUser> => {
+  return requestJson<AuthUser>('/api/auth/me', {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${accessToken}`
+    },
+    body: JSON.stringify(updates)
+  });
+};
+
 export const storeAuthSession = (auth: AuthResponse): StoredAuthSession => {
   const expiresAt = Date.now() + auth.tokens.expiresIn * 1000;
   const stored: StoredAuthSession = {
@@ -131,6 +149,7 @@ export const clearAuthSession = () => {
   localStorage.removeItem(AUTH_STORAGE_KEY);
 };
 
-export const isSessionExpired = (session: StoredAuthSession, skewSeconds = 30) => {
+export const isSessionExpired = (session: StoredAuthSession, skewSeconds = 300) => {
+  // Use 5 minutes (300 seconds) skew to refresh token well before expiration
   return Date.now() >= session.expiresAt - skewSeconds * 1000;
 };

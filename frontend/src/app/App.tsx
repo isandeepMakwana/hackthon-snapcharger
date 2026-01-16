@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
+import EditProfileModal from '@/components/EditProfileModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useStationStore } from '@/store/useStationStore';
 import LoginPage from '@/features/auth/LoginPage';
@@ -18,10 +19,11 @@ import {
   registerUser,
   requestPasswordReset,
   storeAuthSession,
+  updateProfile,
 } from '@/services/authService';
-import { saveDriverProfile, saveHostProfile } from '@/services/profileService';
+import { saveDriverProfile, saveHostProfile, fetchDriverProfile, fetchHostProfile } from '@/services/profileService';
 import type { AuthUser, StoredAuthSession } from '@/types/auth';
-import type { DriverProfileInput, HostProfileInput } from '@/types/profile';
+import type { DriverProfileInput, HostProfileInput, DriverProfile, HostProfile } from '@/types/profile';
 
 const DriverView = lazy(() => import('@/features/driver/DriverView'));
 const HostView = lazy(() => import('@/features/host/HostView'));
@@ -41,6 +43,9 @@ const AppShell = () => {
   const [pendingBookingStationId, setPendingBookingStationId] = useState<string | null>(null);
   const [profileGateMode, setProfileGateMode] = useState<'driver' | 'host' | null>(null);
   const [pendingViewMode, setPendingViewMode] = useState<'driver' | 'host' | null>(null);
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+  const [driverProfileData, setDriverProfileData] = useState<DriverProfile | null>(null);
+  const [hostProfileData, setHostProfileData] = useState<HostProfile | null>(null);
 
   const isAdmin = authSession?.user.role === 'admin';
   const driverProfileComplete = Boolean(authSession?.user.driverProfileComplete);
@@ -163,6 +168,51 @@ const AppShell = () => {
     setLoginIntent('general');
   };
 
+  const handleUpdateProfile = async (updates: {
+    username?: string;
+    email?: string;
+    phoneNumber?: string;
+    password?: string;
+  }) => {
+    if (!authSession) throw new Error('Not authenticated');
+    
+    const updatedUser = await updateProfile(authSession.accessToken, updates);
+    const updatedSession = { ...authSession, user: updatedUser };
+    setAuthSession(updatedSession);
+    persistAuthSession(updatedSession);
+  };
+
+  const handleUpdateDriverProfile = async (profile: { vehicleType: '2W' | '4W'; vehicleModel: string; vehicleNumber?: string }) => {
+    const updated = await saveDriverProfile(profile);
+    setDriverProfileData(updated);
+  };
+
+  const handleUpdateHostProfile = async (profile: { parkingType: string; parkingAddress?: string }) => {
+    const updated = await saveHostProfile(profile);
+    setHostProfileData(updated);
+  };
+
+  const handleOpenEditProfile = async () => {
+    // Fetch profiles when opening the modal
+    if (driverProfileComplete) {
+      try {
+        const profile = await fetchDriverProfile();
+        setDriverProfileData(profile);
+      } catch (error) {
+        console.error('Failed to fetch driver profile:', error);
+      }
+    }
+    if (hostProfileComplete) {
+      try {
+        const profile = await fetchHostProfile();
+        setHostProfileData(profile);
+      } catch (error) {
+        console.error('Failed to fetch host profile:', error);
+      }
+    }
+    setIsEditProfileOpen(true);
+  };
+
   useEffect(() => {
     let isActive = true;
 
@@ -173,22 +223,45 @@ const AppShell = () => {
       }
 
       try {
+        // Check if token is expired
         if (isSessionExpired(stored)) {
-          const refreshed = await refreshSession(stored.refreshToken);
-          const updated = storeAuthSession(refreshed);
-          if (!isActive) return;
-          setAuthSession(updated);
-          applyAuthenticatedState(refreshed.user);
-          return;
+          // Try to refresh the token
+          try {
+            const refreshed = await refreshSession(stored.refreshToken);
+            const updated = storeAuthSession(refreshed);
+            if (!isActive) return;
+            setAuthSession(updated);
+            applyAuthenticatedState(refreshed.user);
+            return;
+          } catch (refreshError) {
+            // If refresh fails, clear session and log out
+            console.error('Token refresh failed:', refreshError);
+            clearAuthSession();
+            if (!isActive) return;
+            setAuthSession(null);
+            setAuthState('guest');
+            return;
+          }
         }
 
-        const profile = await fetchProfile(stored.accessToken);
-        const updatedSession = { ...stored, user: profile, role: profile.role };
-        persistAuthSession(updatedSession);
-        if (!isActive) return;
-        setAuthSession(updatedSession);
-        applyAuthenticatedState(profile);
-      } catch {
+        // Token is still valid, fetch latest profile
+        try {
+          const profile = await fetchProfile(stored.accessToken);
+          const updatedSession = { ...stored, user: profile, role: profile.role };
+          persistAuthSession(updatedSession);
+          if (!isActive) return;
+          setAuthSession(updatedSession);
+          applyAuthenticatedState(profile);
+        } catch (profileError) {
+          // If profile fetch fails but token is valid, use stored session
+          console.warn('Profile fetch failed, using stored session:', profileError);
+          if (!isActive) return;
+          setAuthSession(stored);
+          applyAuthenticatedState(stored.user);
+        }
+      } catch (error) {
+        // Only clear session on critical errors
+        console.error('Session restoration error:', error);
         clearAuthSession();
         if (!isActive) return;
         setAuthSession(null);
@@ -271,9 +344,22 @@ const AppShell = () => {
           isAuthenticated={authState === 'authenticated'}
           onLoginClick={() => handleLoginRequest('general')}
           onLogout={handleLogout}
+          onEditProfile={handleOpenEditProfile}
           authRole={authSession?.user.role ?? null}
           locationLabel={viewMode === 'driver' ? driverConfig?.locationLabel : undefined}
         />
+        {authSession && (
+          <EditProfileModal
+            isOpen={isEditProfileOpen}
+            onClose={() => setIsEditProfileOpen(false)}
+            onSave={handleUpdateProfile}
+            onSaveDriverProfile={handleUpdateDriverProfile}
+            onSaveHostProfile={handleUpdateHostProfile}
+            currentUser={authSession.user}
+            driverProfile={driverProfileData}
+            hostProfile={hostProfileData}
+          />
+        )}
         <ProfileGateModal
           isOpen={profileGateMode !== null}
           mode={profileGateMode ?? 'driver'}

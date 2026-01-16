@@ -1,6 +1,7 @@
 export interface DriverProfileInput {
   vehicleType: '2W' | '4W';
   vehicleModel: string;
+  vehicleNumber?: string;
 }
 
 export interface DriverProfile extends DriverProfileInput {
