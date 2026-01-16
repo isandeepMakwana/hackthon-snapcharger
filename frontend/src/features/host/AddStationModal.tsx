@@ -23,6 +23,8 @@ const AddStationModal = ({
 }: AddStationModalProps) => {
   const [step, setStep] = useState<Step>('upload');
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [localPreviews, setLocalPreviews] = useState<string[]>([]);
+  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [analysisData, setAnalysisData] = useState<GeminiAnalysisResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [addressStatus, setAddressStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
@@ -69,6 +71,8 @@ const AddStationModal = ({
         lng: initialData.lng ?? null,
       });
       setSelectedImages(initialData.image ? [initialData.image] : []);
+      setLocalPreviews([]);
+      setUploadedImages([]);
       setStep('review');
       setAnalysisData(null);
     } else {
@@ -86,6 +90,8 @@ const AddStationModal = ({
         lng: null,
       });
       setSelectedImages([]);
+      setLocalPreviews([]);
+      setUploadedImages([]);
       setAnalysisData(null);
       setStep('upload');
     }
@@ -219,8 +225,9 @@ const AddStationModal = ({
       )
     );
 
-    console.log('Local previews created:', previews.length);
     setSelectedImages(previews);
+    setLocalPreviews(previews);
+    setUploadedImages([]);
 
     setStep('analyzing');
     let result: GeminiAnalysisResult | null = null;
@@ -228,29 +235,17 @@ const AddStationModal = ({
     try {
       // Send all files to backend for processing
       const backendJson = await analyzeHostPhoto(files);
-      console.log('=== BACKEND RESPONSE ===');
-      console.log('Full response:', JSON.stringify(backendJson, null, 2));
-      console.log('image_urls:', backendJson?.image_urls);
-      console.log('image_urls type:', typeof backendJson?.image_urls);
-      console.log('image_urls is array:', Array.isArray(backendJson?.image_urls));
-      
       if (backendJson && backendJson.ai_data) {
         result = mapBackendResultToGemini(backendJson.ai_data);
         
         // Store the S3 image URLs if available
         if (backendJson.image_urls && Array.isArray(backendJson.image_urls) && backendJson.image_urls.length > 0) {
-          console.log('✅ Setting S3 URLs:', backendJson.image_urls);
+          setUploadedImages(backendJson.image_urls);
           setSelectedImages(backendJson.image_urls);
-          // Force a re-render to ensure images update
-          setTimeout(() => {
-            console.log('Current selectedImages state:', backendJson.image_urls);
-          }, 100);
         } else {
-          console.warn('⚠️ No valid image_urls in backend response');
-          console.log('Keeping local previews');
+          setUploadedImages([]);
         }
       } else {
-        console.warn('⚠️ No ai_data in backend response');
         result = mapBackendResultToGemini(backendJson);
       }
     } catch (error) {
@@ -283,7 +278,7 @@ const AddStationModal = ({
     if (!isFormValid) return;
     
     // Use the first S3 URL if available, otherwise use the first selected image
-    const imageUrl = selectedImages.length > 0 ? selectedImages[0] : '';
+    const imageUrl = uploadedImages[0] ?? selectedImages[0] ?? '';
     
     onAddStation({
       id: initialData?.id,
@@ -656,7 +651,6 @@ const AddStationModal = ({
                     {selectedImages.map((image, index) => {
                       const isS3Url = image.includes('s3.') || image.includes('amazonaws.com');
                       const isDataUrl = image.startsWith('data:');
-                      console.log(`Image ${index + 1}:`, { url: image.substring(0, 50) + '...', isS3Url, isDataUrl });
                       
                       return (
                         <div key={`${image}-${index}`} className="relative overflow-hidden rounded-xl border border-border">
@@ -666,12 +660,11 @@ const AddStationModal = ({
                             className="h-20 w-full object-cover"
                             crossOrigin="anonymous"
                             onError={(e) => {
-                              console.error(`❌ Failed to load image ${index + 1}`);
-                              console.error('URL:', image);
-                              console.error('Error:', e);
-                            }}
-                            onLoad={() => {
-                              console.log(`✅ Successfully loaded image ${index + 1}`);
+                              const fallback = localPreviews[index];
+                              if (!fallback) return;
+                              if (e.currentTarget.dataset.fallbackApplied === 'true') return;
+                              e.currentTarget.dataset.fallbackApplied = 'true';
+                              e.currentTarget.src = fallback;
                             }}
                           />
                           <div className="absolute bottom-0 left-0 right-0 bg-black/50 px-1 py-0.5 text-[8px] text-white">
