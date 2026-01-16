@@ -162,4 +162,20 @@ export const MOCK_HOST_STATS = {
   stationHealth: 98
 };
 
+export const MOCK_HOST_BOOKINGS = [
+  {
+    id: 'booking-1',
+    stationId: '1',
+    stationTitle: 'Verma Villa Green Spot',
+    stationLocation: 'Koregaon Park, Pune',
+    stationPricePerHour: 150,
+    driverId: 'driver-1',
+    driverName: 'Aman Sharma',
+    driverPhoneNumber: '+919811112299',
+    startTime: '10:00 AM',
+    status: 'ACTIVE' as const,
+    createdAt: '2024-01-01T10:00:00Z'
+  }
+];
+
 export const INITIAL_USER_AVATAR = "https://picsum.photos/100/100?random=99";

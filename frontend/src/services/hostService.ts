@@ -1,4 +1,5 @@
 import type { HostStats, Station } from '@/types';
+import type { HostBooking } from '@/types/booking';
 import { loadAuthSession } from '@/services/authService';
 
 const getApiBaseUrl = () =>
@@ -52,6 +53,10 @@ export const fetchHostStations = async (): Promise<Station[]> => {
 
 export const fetchHostStats = async (): Promise<HostStats> => {
   return requestJson<HostStats>('/api/host/stats');
+};
+
+export const fetchHostBookings = async (): Promise<HostBooking[]> => {
+  return requestJson<HostBooking[]>('/api/host/bookings');
 };
 
 export const createHostStation = async (payload: Partial<Station>): Promise<Station> => {

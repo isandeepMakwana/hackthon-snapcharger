@@ -60,6 +60,7 @@ const App = () => {
     role: 'driver' | 'host';
     username: string;
     email: string;
+    phoneNumber: string;
     password: string;
     vehicleModel?: string;
     parkingType?: string;
@@ -68,6 +69,7 @@ const App = () => {
       username: payload.username,
       email: payload.email,
       password: payload.password,
+      phoneNumber: payload.phoneNumber,
       role: payload.role,
     });
     const stored = storeAuthSession(result);

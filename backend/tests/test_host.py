@@ -3,7 +3,21 @@ def register_host(client, overrides=None):
         'username': 'hostone',
         'email': 'host@example.com',
         'password': 'Password123!',
+        'phoneNumber': '+919811112255',
         'role': 'host'
+    }
+    if overrides:
+        payload.update(overrides)
+    return client.post('/api/auth/register', json=payload)
+
+
+def register_driver(client, overrides=None):
+    payload = {
+        'username': 'driverone',
+        'email': 'driver@example.com',
+        'password': 'Password123!',
+        'phoneNumber': '+919811112266',
+        'role': 'driver'
     }
     if overrides:
         payload.update(overrides)
@@ -12,6 +26,12 @@ def register_host(client, overrides=None):
 
 def auth_headers(client):
     response = register_host(client)
+    access_token = response.json()['tokens']['accessToken']
+    return {'Authorization': f'Bearer {access_token}'}
+
+
+def auth_headers_for_driver(client):
+    response = register_driver(client)
     access_token = response.json()['tokens']['accessToken']
     return {'Authorization': f'Bearer {access_token}'}
 
@@ -31,12 +51,20 @@ def test_host_station_crud_and_stats(client):
         'lng': 73.8567,
         'phoneNumber': '+919999999999',
         'monthlyEarnings': 5000,
-        'status': 'BUSY'
+        'status': 'AVAILABLE'
     }
 
     create_response = client.post('/api/host/stations', json=create_payload, headers=headers)
     assert create_response.status_code == 201
     station_id = create_response.json()['id']
+
+    driver_headers = auth_headers_for_driver(client)
+    booking_response = client.post(
+        '/api/driver/bookings',
+        json={'stationId': station_id},
+        headers=driver_headers
+    )
+    assert booking_response.status_code == 200
 
     list_response = client.get('/api/host/stations', headers=headers)
     assert list_response.status_code == 200
@@ -44,7 +72,7 @@ def test_host_station_crud_and_stats(client):
 
     stats_response = client.get('/api/host/stats', headers=headers)
     assert stats_response.status_code == 200
-    assert stats_response.json()['totalEarnings'] == 5000
+    assert stats_response.json()['totalEarnings'] == 5150
     assert stats_response.json()['activeBookings'] == 1
     assert stats_response.json()['stationHealth'] == 100
 
@@ -73,3 +101,39 @@ def test_host_analyze_photo(client):
     assert 'socket_type' in payload['ai_data']
     assert 'power_kw' in payload['ai_data']
     assert 'marketing_description' in payload['ai_data']
+
+
+def test_host_bookings_include_driver_contact(client):
+    host_headers = auth_headers(client)
+
+    create_response = client.post('/api/host/stations', json={
+        'title': 'Contact Station',
+        'location': 'Pune',
+        'description': 'Booking contact test',
+        'connectorType': 'Type 2',
+        'powerOutput': '7.2kW',
+        'pricePerHour': 120,
+        'image': 'https://picsum.photos/400/300?random=55',
+        'lat': 18.5204,
+        'lng': 73.8567,
+        'phoneNumber': '+919999000111',
+        'monthlyEarnings': 0,
+        'status': 'AVAILABLE'
+    }, headers=host_headers)
+    assert create_response.status_code == 201
+    station_id = create_response.json()['id']
+
+    driver_headers = auth_headers_for_driver(client)
+    booking_response = client.post(
+        '/api/driver/bookings',
+        json={'stationId': station_id, 'startTime': '10:00 AM'},
+        headers=driver_headers
+    )
+    assert booking_response.status_code == 200
+
+    bookings_response = client.get('/api/host/bookings', headers=host_headers)
+    assert bookings_response.status_code == 200
+    payload = bookings_response.json()
+    assert len(payload) == 1
+    assert payload[0]['driverPhoneNumber'] == '+919811112266'
+    assert payload[0]['stationTitle'] == 'Contact Station'

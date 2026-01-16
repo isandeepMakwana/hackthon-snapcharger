@@ -3,6 +3,7 @@ def register_user(client, role: str, overrides=None):
         'username': f'{role}user',
         'email': f'{role}@example.com',
         'password': 'Password123!',
+        'phoneNumber': '+919811112277',
         'role': role
     }
     if overrides:

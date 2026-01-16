@@ -14,6 +14,6 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db() -> None:
     from app.db.base import Base
-    from app.db.models import user, session, email_verification, password_reset, station
+    from app.db.models import user, session, email_verification, password_reset, station, booking
 
     Base.metadata.create_all(bind=engine)

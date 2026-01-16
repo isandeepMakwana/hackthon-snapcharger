@@ -7,6 +7,7 @@ def register_user(client, overrides=None):
         'username': 'driverone',
         'email': 'driver@example.com',
         'password': 'Password123!',
+        'phoneNumber': '+919811112233',
         'role': 'driver'
     }
     if overrides:

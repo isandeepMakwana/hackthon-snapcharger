@@ -3,12 +3,13 @@ from app.db.models.user import User
 from app.security import hash_password
 
 
-def create_user(username, email, password, role='driver', permissions=None):
+def create_user(username, email, password, role='driver', permissions=None, phone_number='+919811112233'):
     db = SessionLocal()
     user = User(
         username=username,
         email=email,
         password_hash=hash_password(password),
+        phone_number=phone_number,
         role=role,
         permissions=permissions or []
     )
@@ -35,6 +36,7 @@ def test_admin_can_create_and_list_users(client):
             'username': 'driver2',
             'email': 'driver2@example.com',
             'password': 'Password123!',
+            'phoneNumber': '+919811112244',
             'role': 'driver'
         }
     )

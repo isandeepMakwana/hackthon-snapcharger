@@ -61,6 +61,7 @@ async def register(
         username=payload.username.strip(),
         email=payload.email.lower(),
         password_hash=hash_password(payload.password),
+        phone_number=payload.phone_number.strip(),
         role=role,
         permissions=[]
     )

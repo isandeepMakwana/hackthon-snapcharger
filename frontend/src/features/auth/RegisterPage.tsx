@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { ArrowRight, Car, Home, Loader2, Lock, Mail, User, Zap } from 'lucide-react';
+import { ArrowRight, Car, Home, Loader2, Lock, Mail, Phone, User, Zap } from 'lucide-react';
 
 interface RegisterPageProps {
   onRegister: (payload: {
     role: 'driver' | 'host';
     username: string;
     email: string;
+    phoneNumber: string;
     password: string;
     vehicleModel?: string;
     parkingType?: string;
@@ -19,6 +20,7 @@ const RegisterPage = ({ onRegister, onNavigateToLogin, notice }: RegisterPagePro
   const [isLoading, setIsLoading] = useState(false);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [vehicleModel, setVehicleModel] = useState('');
   const [parkingType, setParkingType] = useState('');
@@ -34,6 +36,7 @@ const RegisterPage = ({ onRegister, onNavigateToLogin, notice }: RegisterPagePro
         role,
         username,
         email,
+        phoneNumber,
         password,
         vehicleModel: role === 'driver' ? vehicleModel : undefined,
         parkingType: role === 'host' ? parkingType : undefined,
@@ -129,6 +132,24 @@ const RegisterPage = ({ onRegister, onNavigateToLogin, notice }: RegisterPagePro
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="john@example.com"
+                  className="w-full rounded-xl border border-border bg-surface px-10 py-3 text-sm text-ink shadow-soft"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold uppercase text-muted" htmlFor="register-phone">
+                Phone number
+              </label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
+                <input
+                  id="register-phone"
+                  type="tel"
+                  required
+                  value={phoneNumber}
+                  onChange={(event) => setPhoneNumber(event.target.value)}
+                  placeholder="+91 98765 43210"
                   className="w-full rounded-xl border border-border bg-surface px-10 py-3 text-sm text-ink shadow-soft"
                 />
               </div>

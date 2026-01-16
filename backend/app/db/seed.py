@@ -9,6 +9,7 @@ settings = get_settings()
 
 DEMO_HOST_EMAIL = 'demo.host@snapcharge.dev'
 DEMO_HOST_USERNAME = 'Demo Host'
+DEMO_HOST_PHONE = '+919811112222'
 
 DEMO_STATIONS = [
     {
@@ -132,10 +133,14 @@ def ensure_global_demo_stations(db: Session) -> List[Station]:
             password_hash=hash_password('DemoPassword123!'),
             role='host',
             permissions=[],
+            phone_number=DEMO_HOST_PHONE,
             email_verified=True
         )
         db.add(host)
         db.flush()
+    elif not host.phone_number:
+        host.phone_number = DEMO_HOST_PHONE
+        db.commit()
 
     stations = []
     for payload in DEMO_STATIONS:
