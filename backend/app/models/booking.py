@@ -22,3 +22,20 @@ class HostBookingOut(CamelModel):
     start_time: Optional[str] = None
     status: BookingStatus
     created_at: datetime
+
+
+class DriverBookingOut(CamelModel):
+    id: str
+    station_id: str
+    station_title: str
+    station_location: str
+    station_price_per_hour: int
+    station_image: str
+    station_lat: float
+    station_lng: float
+    host_id: str
+    host_name: str
+    host_phone_number: Optional[str] = None
+    start_time: Optional[str] = None
+    status: BookingStatus
+    created_at: datetime

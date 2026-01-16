@@ -92,6 +92,31 @@ def test_driver_booking_updates_station(client):
     assert search_response.json()[0]['status'] == 'AVAILABLE'
 
 
+def test_driver_bookings_list_returns_station_details(client):
+    host_headers = auth_headers_for_role(client, 'host')
+    station = create_station_for_host(client, host_headers)
+    driver_headers = auth_headers_for_role(client, 'driver')
+
+    booking_response = client.post(
+        '/api/driver/bookings',
+        json={'stationId': station['id'], 'startTime': '10:00 AM'},
+        headers=driver_headers
+    )
+    assert booking_response.status_code == 200
+
+    list_response = client.get('/api/driver/bookings', headers=driver_headers)
+    assert list_response.status_code == 200
+    payload = list_response.json()
+    assert len(payload) == 1
+    booking = payload[0]
+    assert booking['stationTitle'] == station['title']
+    assert booking['stationLocation'] == station['location']
+    assert booking['stationPricePerHour'] == station['pricePerHour']
+    assert booking['stationImage'] == station['image']
+    assert booking['hostName'] == station['hostName']
+    assert booking['hostPhoneNumber'] == station['phoneNumber']
+
+
 def test_driver_booking_rejects_unavailable_station(client):
     host_headers = auth_headers_for_role(client, 'host')
     station = create_station_for_host(client, host_headers, {'status': 'OFFLINE'})

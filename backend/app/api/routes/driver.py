@@ -8,6 +8,7 @@ from app.db.models.booking import Booking
 from app.db.models.station import Station
 from app.db.models.user import User
 from app.db.seed import ensure_global_demo_stations
+from app.models.booking import DriverBookingOut
 from app.models.driver import (
     BookingConfig,
     BookingRequest,
@@ -167,6 +168,42 @@ async def search_stations(
     booked_slots = _fetch_booked_slots(db, [station.id for station, _ in candidates])
     for station, dist in candidates:
         results.append(build_station_out(station, dist, booked_slots.get(station.id, [])))
+
+    return results
+
+
+@router.get('/bookings', response_model=list[DriverBookingOut])
+async def list_driver_bookings(
+    current_user: User = Depends(require_driver_profile),
+    db: Session = Depends(get_db)
+) -> list[DriverBookingOut]:
+    rows = db.query(Booking, Station, User).join(
+        Station, Booking.station_id == Station.id
+    ).join(
+        User, Station.host_id == User.id
+    ).filter(
+        Booking.driver_id == current_user.id
+    ).order_by(Booking.created_at.desc()).all()
+
+    results: list[DriverBookingOut] = []
+    for booking, station, host in rows:
+        contact_number = station.phone_number or host.phone_number
+        results.append(DriverBookingOut(
+            id=booking.id,
+            station_id=station.id,
+            station_title=station.title,
+            station_location=station.location,
+            station_price_per_hour=station.price_per_hour,
+            station_image=station.image,
+            station_lat=station.lat,
+            station_lng=station.lng,
+            host_id=station.host_id,
+            host_name=station.host_name,
+            host_phone_number=contact_number,
+            start_time=booking.start_time,
+            status=booking.status,
+            created_at=booking.created_at
+        ))
 
     return results
 
