@@ -25,6 +25,7 @@ const HostView = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [bookings, setBookings] = useState<HostBooking[]>([]);
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
+  const [updatingStations, setUpdatingStations] = useState<Set<string>>(new Set());
 
   const myStations = useMemo(() => stations, [stations]);
 
@@ -110,10 +111,13 @@ const HostView = () => {
 
   const handleToggleStatus = async (stationId: string) => {
     const target = stations.find((station) => station.id === stationId);
-    if (!target) return;
+    if (!target || updatingStations.has(stationId)) return;
 
     const nextStatus =
       target.status === StationStatus.OFFLINE ? StationStatus.AVAILABLE : StationStatus.OFFLINE;
+
+    setUpdatingStations((prev) => new Set(prev).add(stationId));
+    toggleStationStatus(stationId);
 
     try {
       const updated = await updateHostStation(stationId, { status: nextStatus });
@@ -123,6 +127,12 @@ const HostView = () => {
     } catch {
       toggleStationStatus(stationId);
       setErrorMessage('Unable to update station status. Please check your login and try again.');
+    } finally {
+      setUpdatingStations((prev) => {
+        const next = new Set(prev);
+        next.delete(stationId);
+        return next;
+      });
     }
   };
 
@@ -208,6 +218,7 @@ const HostView = () => {
               station={station}
               onToggleStatus={handleToggleStatus}
               onEdit={handleEditClick}
+              isUpdating={updatingStations.has(station.id)}
             />
           ))}
         </div>
