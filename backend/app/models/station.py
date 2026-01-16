@@ -54,6 +54,7 @@ class StationUpdate(CamelModel):
 
 class StationOut(CamelModel):
     id: str
+    host_id: str
     host_name: str
     title: str
     location: str

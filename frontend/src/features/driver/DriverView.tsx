@@ -11,6 +11,7 @@ import type { Station } from '@/types';
 import { StationStatus } from '@/types';
 import { useStationStore } from '@/store/useStationStore';
 import { createDriverBooking, fetchDriverConfig, fetchDriverStations } from '@/services/driverService';
+import { loadAuthSession } from '@/services/authService';
 
 interface DriverViewProps {
   isLoggedIn: boolean;
@@ -67,17 +68,28 @@ const DriverView = ({
     return `${title}|${location}|${station.lat.toFixed(5)}|${station.lng.toFixed(5)}`;
   }, []);
 
+  const currentUserId = useMemo(() => loadAuthSession()?.user.id ?? null, []);
+
   const uniqueStations = useMemo(() => {
     const seen = new Set<string>();
     const result: Station[] = [];
     stations.forEach((station) => {
       const key = getStationKey(station);
-      if (seen.has(key)) return;
-      seen.add(key);
-      result.push(station);
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(station);
+        return;
+      }
+      if (!currentUserId || !station.hostId) return;
+      const existingIndex = result.findIndex((item) => getStationKey(item) === key);
+      if (existingIndex === -1) return;
+      const existing = result[existingIndex];
+      if (existing.hostId !== currentUserId && station.hostId === currentUserId) {
+        result[existingIndex] = station;
+      }
     });
     return result;
-  }, [stations, getStationKey]);
+  }, [stations, getStationKey, currentUserId]);
 
   const selectedStation = useMemo(
     () => uniqueStations.find((station) => station.id === selectedStationId) || null,
@@ -482,34 +494,36 @@ const DriverView = ({
                 vehicleTypeOptions={driverConfig?.vehicleTypeOptions ?? []}
                 searchPlaceholder={driverConfig?.searchPlaceholder ?? ''}
               />
-              <div className="mt-3 flex items-center gap-3">
-                <label htmlFor="radius-input" className="text-xs text-muted whitespace-nowrap">
-                  Radius (km):
-                </label>
-                <input
-                  id="radius-input"
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={searchRadius}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value);
-                    if (!isNaN(val) && val >= 1 && val <= 100) {
-                      setSearchRadius(val);
-                    } else if (e.target.value === '') {
-                      setSearchRadius(10);
-                    }
-                  }}
-                  className="w-20 rounded-lg border border-border bg-surface px-2 py-1 text-xs text-ink focus:border-accent focus:outline-none"
-                />
-              </div>
-              <div className="mt-3 flex items-center justify-between text-xs text-muted">
-                <span>{uniqueStations.length} stations</span>
-                {driverConfig?.personalizedLabel && (
-                  <span className="flex items-center gap-1">
-                    <Filter size={12} /> {driverConfig.personalizedLabel}
-                  </span>
-                )}
+              <div className="mt-4 rounded-2xl border border-border/60 bg-surface-strong/60 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <label htmlFor="radius-input" className="text-xs font-semibold text-ink whitespace-nowrap">
+                    Radius (km)
+                  </label>
+                  <input
+                    id="radius-input"
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={searchRadius}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value);
+                      if (!isNaN(val) && val >= 1 && val <= 100) {
+                        setSearchRadius(val);
+                      } else if (e.target.value === '') {
+                        setSearchRadius(10);
+                      }
+                    }}
+                    className="w-24 rounded-xl border border-border/80 bg-surface px-3 py-2 text-xs font-semibold text-ink shadow-sm focus:border-accent focus:outline-none"
+                  />
+                </div>
+                <div className="mt-3 flex items-center justify-between text-xs text-muted">
+                  <span>{uniqueStations.length} stations</span>
+                  {driverConfig?.personalizedLabel && (
+                    <span className="flex items-center gap-1">
+                      <Filter size={12} /> {driverConfig.personalizedLabel}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 

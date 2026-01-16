@@ -11,6 +11,7 @@ export interface Coordinates {
 
 export interface Station {
   id: string;
+  hostId?: string;
   hostName: string;
   title: string;
   location: string;
