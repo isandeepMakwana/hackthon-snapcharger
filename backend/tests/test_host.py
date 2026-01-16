@@ -22,6 +22,19 @@ def register_driver(client, overrides=None):
     return client.post('/api/auth/register', json=payload)
 
 
+def register_driver(client, overrides=None):
+    payload = {
+        'username': 'driverone',
+        'email': 'driver@example.com',
+        'password': 'Password123!',
+        'phoneNumber': '+919811112266',
+        'role': 'driver'
+    }
+    if overrides:
+        payload.update(overrides)
+    return client.post('/api/auth/register', json=payload)
+
+
 def auth_headers(client):
     response = register_host(client)
     access_token = response.json()['tokens']['accessToken']
@@ -44,6 +57,12 @@ def auth_headers_for_driver(client):
     }, headers=headers)
     assert profile_response.status_code == 200
     return headers
+
+
+def auth_headers_for_driver(client):
+    response = register_driver(client)
+    access_token = response.json()['tokens']['accessToken']
+    return {'Authorization': f'Bearer {access_token}'}
 
 
 def test_host_station_crud_and_stats(client):
