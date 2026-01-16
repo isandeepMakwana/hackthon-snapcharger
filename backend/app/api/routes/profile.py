@@ -83,11 +83,15 @@ async def upsert_host_profile(
     if profile:
         profile.parking_type = payload.parking_type
         profile.parking_address = payload.parking_address
+        profile.parking_lat = payload.parking_lat
+        profile.parking_lng = payload.parking_lng
     else:
         profile = HostProfile(
             user_id=current_user.id,
             parking_type=payload.parking_type,
-            parking_address=payload.parking_address
+            parking_address=payload.parking_address,
+            parking_lat=payload.parking_lat,
+            parking_lng=payload.parking_lng
         )
         db.add(profile)
     db.commit()
