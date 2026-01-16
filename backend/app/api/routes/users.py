@@ -54,6 +54,7 @@ async def create_user(
         username=payload.username.strip(),
         email=payload.email.lower(),
         password_hash=hash_password(payload.password),
+        phone_number=payload.phone_number.strip(),
         role=role,
         permissions=payload.permissions
     )
@@ -128,6 +129,9 @@ async def update_user(
 
     if 'password' in updates:
         user.password_hash = hash_password(updates['password'])
+
+    if 'phone_number' in updates:
+        user.phone_number = updates['phone_number'].strip() if updates['phone_number'] else None
 
     if 'role' in updates:
         if updates['role'] not in {'driver', 'host', 'admin'}:

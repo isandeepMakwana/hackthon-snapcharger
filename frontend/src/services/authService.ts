@@ -49,6 +49,7 @@ export const registerUser = async (payload: {
   username: string;
   email: string;
   password: string;
+  phoneNumber: string;
   role: AuthRole;
 }): Promise<AuthResponse> => {
   return requestJson<AuthResponse>('/api/auth/register', {

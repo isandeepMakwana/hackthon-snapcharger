@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from starlette import status
 from app.api.deps import get_db, require_role
 from app.api.utils.stations import build_station_out, distance_km, parse_power_kw
+from app.db.models.booking import Booking
 from app.db.models.station import Station
 from app.db.models.user import User
 from app.db.seed import ensure_global_demo_stations
@@ -141,6 +142,12 @@ async def create_booking(
     current_user: User = Depends(require_role('driver', 'admin')),
     db: Session = Depends(get_db)
 ) -> StationOut:
+    if not current_user.phone_number:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={'code': 'MISSING_PHONE', 'message': 'Phone number is required to book a station.'}
+        )
+
     station = db.query(Station).filter(Station.id == payload.station_id).first()
     if not station:
         raise HTTPException(
@@ -153,6 +160,21 @@ async def create_booking(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={'code': 'UNAVAILABLE', 'message': 'Station is not available.'}
         )
+
+    if not station.phone_number:
+        host = db.query(User).filter(User.id == station.host_id).first()
+        if host and host.phone_number:
+            station.phone_number = host.phone_number
+
+    db.add(Booking(
+        station_id=station.id,
+        host_id=station.host_id,
+        driver_id=current_user.id,
+        driver_name=current_user.username,
+        driver_phone_number=current_user.phone_number,
+        status='ACTIVE',
+        start_time=payload.start_time
+    ))
 
     station.status = 'BUSY'
     station.monthly_earnings += station.price_per_hour

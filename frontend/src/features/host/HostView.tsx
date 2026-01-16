@@ -1,11 +1,13 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Activity, Calendar, IndianRupee, Plus } from 'lucide-react';
+import HostBookingCard from '@/features/host/components/HostBookingCard';
 import HostStatsCard from '@/features/host/components/HostStatsCard';
 import HostStationCard from '@/features/host/components/HostStationCard';
 import type { Station } from '@/types';
 import { StationStatus } from '@/types';
 import { useStationStore } from '@/store/useStationStore';
-import { createHostStation, fetchHostStats, fetchHostStations, updateHostStation } from '@/services/hostService';
+import type { HostBooking } from '@/types/booking';
+import { createHostStation, fetchHostBookings, fetchHostStats, fetchHostStations, updateHostStation } from '@/services/hostService';
 
 const AddStationModal = lazy(() => import('@/features/host/AddStationModal'));
 
@@ -20,6 +22,7 @@ const HostView = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStation, setEditingStation] = useState<Station | undefined>();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [bookings, setBookings] = useState<HostBooking[]>([]);
 
   const myStations = useMemo(() => stations, [stations]);
 
@@ -37,15 +40,18 @@ const HostView = () => {
 
     const loadHostData = async () => {
       try {
-        const [stationData, statsData] = await Promise.all([
+        const [stationData, statsData, bookingData] = await Promise.all([
           fetchHostStations(),
-          fetchHostStats()
+          fetchHostStats(),
+          fetchHostBookings()
         ]);
         if (!isMounted) return;
         loadStations(stationData);
         setHostStats(statsData);
+        setBookings(bookingData);
         setErrorMessage(null);
       } catch {
+        if (!isMounted) return;
         setErrorMessage('Unable to load host data. Please ensure you are signed in and try again.');
       }
     };
@@ -165,6 +171,24 @@ const HostView = () => {
       </div>
 
       <div className="flex-1 px-4 pb-16 pt-8 md:px-6">
+        <div className="mb-6">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-ink">Recent Bookings</h2>
+            <span className="text-xs font-semibold text-muted">{bookings.length} total</span>
+          </div>
+          {bookings.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border bg-surface px-6 py-8 text-center text-sm text-muted">
+              No bookings yet. New driver bookings will appear here.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {bookings.map((booking) => (
+                <HostBookingCard key={booking.id} booking={booking} />
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold text-ink">My Stations</h2>
           <span className="text-xs font-semibold text-muted">{myStations.length} total</span>

@@ -4,6 +4,7 @@ export interface AuthUser {
   id: string;
   username: string;
   email: string;
+  phoneNumber?: string;
   role: AuthRole;
   permissions: string[];
   emailVerified: boolean;

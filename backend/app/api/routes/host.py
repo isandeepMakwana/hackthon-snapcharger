@@ -3,9 +3,11 @@ from sqlalchemy.orm import Session
 from starlette import status
 from app.api.deps import get_db, require_role
 from app.api.utils.stations import build_station_out
+from app.db.models.booking import Booking
 from app.db.models.station import Station
 from app.db.models.user import User
 from app.db.seed import ensure_demo_stations_for_host
+from app.models.booking import HostBookingOut
 from app.models.station import HostStats, StationCreate, StationOut, StationStatus, StationUpdate
 
 router = APIRouter(prefix='/api/host', tags=['host'])
@@ -23,7 +25,10 @@ async def get_stats(
         return HostStats(total_earnings=0, active_bookings=0, station_health=0)
 
     total_earnings = sum(station.monthly_earnings for station in stations)
-    active_bookings = sum(1 for station in stations if station.status == StationStatus.BUSY.value)
+    active_bookings = db.query(Booking).filter(
+        Booking.host_id == current_user.id,
+        Booking.status == 'ACTIVE'
+    ).count()
     online = sum(1 for station in stations if station.status != StationStatus.OFFLINE.value)
     station_health = round((online / len(stations)) * 100)
 
@@ -55,6 +60,7 @@ async def create_station(
     image = payload.image.strip() if payload.image else ''
     if not image:
         image = 'https://picsum.photos/400/300?random=99'
+    station_phone = payload.phone_number.strip() if payload.phone_number else current_user.phone_number
 
     station = Station(
         host_id=current_user.id,
@@ -71,7 +77,7 @@ async def create_station(
         description=payload.description,
         lat=payload.lat,
         lng=payload.lng,
-        phone_number=payload.phone_number,
+        phone_number=station_phone,
         monthly_earnings=payload.monthly_earnings
     )
     db.add(station)
@@ -79,6 +85,36 @@ async def create_station(
     db.refresh(station)
 
     return build_station_out(station)
+
+
+@router.get('/bookings', response_model=list[HostBookingOut])
+async def list_bookings(
+    current_user: User = Depends(require_role('host', 'admin')),
+    db: Session = Depends(get_db)
+) -> list[HostBookingOut]:
+    rows = db.query(Booking, Station).join(
+        Station, Booking.station_id == Station.id
+    ).filter(
+        Booking.host_id == current_user.id
+    ).order_by(Booking.created_at.desc()).all()
+
+    results: list[HostBookingOut] = []
+    for booking, station in rows:
+        results.append(HostBookingOut(
+            id=booking.id,
+            station_id=booking.station_id,
+            station_title=station.title,
+            station_location=station.location,
+            station_price_per_hour=station.price_per_hour,
+            driver_id=booking.driver_id,
+            driver_name=booking.driver_name,
+            driver_phone_number=booking.driver_phone_number,
+            start_time=booking.start_time,
+            status=booking.status,
+            created_at=booking.created_at
+        ))
+
+    return results
 
 
 @router.patch('/stations/{station_id}', response_model=StationOut)
@@ -108,8 +144,15 @@ async def update_station(
     if 'status' in updates and isinstance(updates['status'], StationStatus):
         updates['status'] = updates['status'].value
 
+    status_update = updates.get('status')
     for key, value in updates.items():
         setattr(station, key, value)
+
+    if status_update == StationStatus.OFFLINE.value:
+        db.query(Booking).filter(
+            Booking.station_id == station.id,
+            Booking.status == 'ACTIVE'
+        ).update({Booking.status: 'CANCELLED'})
 
     db.commit()
     db.refresh(station)
