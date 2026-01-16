@@ -25,6 +25,15 @@ class Settings(BaseSettings):
 
     seed_demo_data: bool = False
 
+    # Google API
+    google_api_key: str = Field(default='')
+
+    # AWS S3
+    aws_access_key_id: str = Field(default='')
+    aws_secret_access_key: str = Field(default='')
+    aws_region: str = Field(default='us-east-1')
+    aws_bucket_name: str = Field(default='')
+
 
 def get_settings() -> Settings:
     return Settings()

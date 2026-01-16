@@ -22,7 +22,7 @@ class StationCreate(CamelModel):
     connector_type: str = Field(min_length=2, max_length=60)
     power_output: str = Field(min_length=2, max_length=60)
     price_per_hour: int = Field(ge=0)
-    image: str = Field(default='', max_length=512)
+    image: str = Field(default='')  # URL from S3 or external source
     lat: float
     lng: float
     phone_number: Optional[str] = Field(default=None, max_length=30)
@@ -41,7 +41,7 @@ class StationUpdate(CamelModel):
     connector_type: Optional[str] = Field(default=None, min_length=2, max_length=60)
     power_output: Optional[str] = Field(default=None, min_length=2, max_length=60)
     price_per_hour: Optional[int] = Field(default=None, ge=0)
-    image: Optional[str] = Field(default=None, min_length=1, max_length=512)
+    image: Optional[str] = Field(default=None)
     lat: Optional[float] = None
     lng: Optional[float] = None
     phone_number: Optional[str] = Field(default=None, max_length=30)
