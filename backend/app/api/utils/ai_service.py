@@ -90,7 +90,20 @@ async def analyze_multiple_images(image_byte_list: list[bytes]):
     try:
         # 2. Call Gemini with the LIST of contents
         response = model.generate_content(content_payload)
-        
+        if hasattr(response, 'usage_metadata'):
+            usage = response.usage_metadata
+            
+            # Extract specific counts (default to 0 if missing)
+            prompt_tokens = usage.prompt_token_count
+            cached_tokens = getattr(usage, 'cached_content_token_count', 0)
+            output_tokens = usage.candidates_token_count
+            total_tokens = usage.total_token_count
+            
+            logger.info(f"TOKEN USAGE REPORT:")
+            logger.info(f"   • Input (Prompt):  {prompt_tokens}")
+            logger.info(f"   • Cached Input:    {cached_tokens} (Money Saved!)")
+            logger.info(f"   • Output (Model):  {output_tokens}")
+            logger.info(f"   • Total Billed:    {total_tokens}")
         # 3. Parse Response
         text_response = response.text.strip()
         if text_response.startswith("```"):
