@@ -43,6 +43,7 @@ jest.mock('@/services/driverService', () => ({
   __esModule: true,
   fetchDriverStations: jest.fn(async () => MOCK_STATIONS),
   fetchDriverConfig: jest.fn(async () => MOCK_DRIVER_CONFIG),
+  fetchDriverBookings: jest.fn(async () => []),
   createDriverBooking: jest.fn(async () => ({
     ...MOCK_STATIONS[0],
     status: StationStatus.BUSY

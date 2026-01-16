@@ -1,5 +1,6 @@
 import type { Station } from '@/types';
 import type { DriverConfig } from '@/types/driver';
+import type { DriverBooking } from '@/types/booking';
 import { loadAuthSession } from '@/services/authService';
 
 const getApiBaseUrl = () =>
@@ -104,5 +105,13 @@ export const createDriverBooking = async (payload: {
       ...getAuthHeaders()
     },
     body: JSON.stringify(payload)
+  });
+};
+
+export const fetchDriverBookings = async (): Promise<DriverBooking[]> => {
+  return requestJson<DriverBooking[]>('/api/driver/bookings', {
+    headers: {
+      ...getAuthHeaders()
+    }
   });
 };

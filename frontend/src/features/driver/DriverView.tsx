@@ -5,6 +5,8 @@ import DriverFilters from '@/features/driver/components/DriverFilters';
 import MapCanvas from '@/features/driver/components/MapCanvas';
 import StationCard from '@/features/driver/components/StationCard';
 import StationDetailPanel from '@/features/driver/components/StationDetailPanel';
+import DriverBookingsView from '@/features/driver/DriverBookingsView';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { Station } from '@/types';
 import { StationStatus } from '@/types';
 import { useStationStore } from '@/store/useStationStore';
@@ -54,6 +56,7 @@ const DriverView = ({
   const [vehicleType, setVehicleType] = useState('ALL');
   const [activeTags, setActiveTags] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeSection, setActiveSection] = useState<'discover' | 'bookings'>('discover');
 
   const selectedStation = useMemo(
     () => stations.find((station) => station.id === selectedStationId) || null,
@@ -318,185 +321,213 @@ const DriverView = ({
   };
 
   return (
-    <div className="relative flex h-[calc(100vh-64px)] flex-col overflow-hidden md:flex-row">
-      {showSuccessToast && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="absolute left-1/2 top-4 z-[1000] w-11/12 max-w-sm -translate-x-1/2 animate-in slide-in-from-top-5"
-        >
-          <div className="flex items-center gap-3 rounded-2xl bg-accent px-4 py-3 text-white shadow-glow">
-            <CheckCircle size={22} className="shrink-0" />
-            <div>
-              <p className="text-sm font-semibold">Booking Confirmed!</p>
-              <p className="text-xs opacity-90">Slot reserved for {selectedTimeSlot}</p>
-            </div>
-          </div>
+    <Tabs
+      value={activeSection}
+      onValueChange={(value) => setActiveSection(value as 'discover' | 'bookings')}
+      className="flex h-[calc(100vh-64px)] flex-col overflow-hidden"
+    >
+      <div className="flex items-center justify-between border-b border-border bg-surface-strong/90 px-4 py-3 md:px-6">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Driver dashboard</p>
+          <p className="text-sm text-muted">Explore stations or review your bookings.</p>
         </div>
-      )}
+        <TabsList aria-label="Driver view toggle">
+          <TabsTrigger value="discover">Discover</TabsTrigger>
+          <TabsTrigger value="bookings">My bookings</TabsTrigger>
+        </TabsList>
+      </div>
 
-      {errorMessage && (
-        <div
-          role="alert"
-          className="absolute left-1/2 top-4 z-[1000] w-11/12 max-w-sm -translate-x-1/2 animate-in slide-in-from-top-5"
-        >
-          <div className="flex items-center gap-3 rounded-2xl bg-rose-500 px-4 py-3 text-white shadow-glow">
-            <span className="text-sm font-semibold">{errorMessage}</span>
-          </div>
-        </div>
-      )}
-
-      {showBookingConfirm && selectedStation && (
-        <div
-          className="fixed inset-0 z-[1100] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="booking-title"
-          aria-describedby="booking-description"
-        >
-          <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-surface-strong shadow-2xl">
-            <div className="p-6 text-center">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-accent/15 text-accent">
-                <CalendarClock size={22} />
-              </div>
-              <h3 id="booking-title" className="text-lg font-semibold text-ink">
-                Confirm Booking
-              </h3>
-              <p id="booking-description" className="mt-2 text-sm text-muted">
-                Book <span className="font-semibold text-ink">{selectedStation.title}</span> for today?
-              </p>
-              <div className="mt-4 rounded-xl border border-border bg-surface px-3 py-2 text-sm text-muted">
-                Reserve at <span className="font-semibold text-ink">{selectedTimeSlot}</span>
-              </div>
-              <div className="mt-4 flex items-center justify-between text-sm text-muted">
-                <span>Hourly Rate</span>
-                <span className="font-semibold text-ink">₹{selectedStation.pricePerHour}</span>
-              </div>
-              <div className="mt-2 flex items-center justify-between text-sm text-muted">
-                <span>Service Fee</span>
-                <span className="font-semibold text-ink">₹10</span>
+      <TabsContent value="discover" className="flex-1 min-h-0">
+        <div className="relative flex h-full flex-col overflow-hidden md:flex-row">
+          {showSuccessToast && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="absolute left-1/2 top-4 z-[1000] w-11/12 max-w-sm -translate-x-1/2 animate-in slide-in-from-top-5"
+            >
+              <div className="flex items-center gap-3 rounded-2xl bg-accent px-4 py-3 text-white shadow-glow">
+                <CheckCircle size={22} className="shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold">Booking Confirmed!</p>
+                  <p className="text-xs opacity-90">Slot reserved for {selectedTimeSlot}</p>
+                </div>
               </div>
             </div>
-            <div className="flex border-t border-border">
-              <button
-                type="button"
-                onClick={() => setShowBookingConfirm(false)}
-                className="flex-1 py-3 text-sm font-semibold text-muted transition hover:bg-surface"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={confirmBooking}
-                className="flex-1 py-3 text-sm font-semibold text-accent transition hover:bg-accent/10"
-              >
-                Confirm
-              </button>
+          )}
+
+          {errorMessage && (
+            <div
+              role="alert"
+              className="absolute left-1/2 top-4 z-[1000] w-11/12 max-w-sm -translate-x-1/2 animate-in slide-in-from-top-5"
+            >
+              <div className="flex items-center gap-3 rounded-2xl bg-rose-500 px-4 py-3 text-white shadow-glow">
+                <span className="text-sm font-semibold">{errorMessage}</span>
+              </div>
+            </div>
+          )}
+
+          {showBookingConfirm && selectedStation && (
+            <div
+              className="fixed inset-0 z-[1100] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="booking-title"
+              aria-describedby="booking-description"
+            >
+              <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-surface-strong shadow-2xl">
+                <div className="p-6 text-center">
+                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-accent/15 text-accent">
+                    <CalendarClock size={22} />
+                  </div>
+                  <h3 id="booking-title" className="text-lg font-semibold text-ink">
+                    Confirm Booking
+                  </h3>
+                  <p id="booking-description" className="mt-2 text-sm text-muted">
+                    Book <span className="font-semibold text-ink">{selectedStation.title}</span> for today?
+                  </p>
+                  <div className="mt-4 rounded-xl border border-border bg-surface px-3 py-2 text-sm text-muted">
+                    Reserve at <span className="font-semibold text-ink">{selectedTimeSlot}</span>
+                  </div>
+                  <div className="mt-4 flex items-center justify-between text-sm text-muted">
+                    <span>Hourly Rate</span>
+                    <span className="font-semibold text-ink">₹{selectedStation.pricePerHour}</span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-sm text-muted">
+                    <span>Service Fee</span>
+                    <span className="font-semibold text-ink">₹10</span>
+                  </div>
+                </div>
+                <div className="flex border-t border-border">
+                  <button
+                    type="button"
+                    onClick={() => setShowBookingConfirm(false)}
+                    className="flex-1 py-3 text-sm font-semibold text-muted transition hover:bg-surface"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmBooking}
+                    className="flex-1 py-3 text-sm font-semibold text-accent transition hover:bg-accent/10"
+                  >
+                    Confirm
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="order-2 flex h-[60%] w-full flex-col rounded-t-3xl bg-surface-strong shadow-soft md:order-1 md:h-full md:w-5/12 lg:w-4/12 md:rounded-none">
+            <div className="md:hidden flex w-full justify-center pt-3 pb-1">
+              <div className="h-1.5 w-12 rounded-full bg-border" />
+            </div>
+            <div className="border-b border-border p-4">
+              <DriverFilters
+                statusFilter={statusFilter}
+                setStatusFilter={setStatusFilter}
+                vehicleType={vehicleType}
+                setVehicleType={setVehicleType}
+                activeTags={activeTags}
+                toggleTag={toggleTag}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                filterTags={driverConfig?.filterTags ?? []}
+                statusOptions={driverConfig?.statusOptions ?? []}
+                vehicleTypeOptions={driverConfig?.vehicleTypeOptions ?? []}
+                searchPlaceholder={driverConfig?.searchPlaceholder ?? ''}
+              />
+              <div className="mt-3 flex items-center justify-between text-xs text-muted">
+                <span>{stations.length} stations</span>
+                {driverConfig?.personalizedLabel && (
+                  <span className="flex items-center gap-1">
+                    <Filter size={12} /> {driverConfig.personalizedLabel}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex-1 space-y-4 overflow-y-auto bg-surface px-4 py-4">
+              {stations.length === 0 ? (
+                <div className="flex h-48 flex-col items-center justify-center text-muted">
+                  <Filter size={28} className="mb-2 opacity-60" />
+                  <p className="text-sm">No stations found for these filters.</p>
+                </div>
+              ) : (
+                stations.map((station, index) => (
+                  <Link
+                    key={station.id}
+                    to={`/stations/${getStationSlug(station)}`}
+                    onClick={() => selectStation(station)}
+                    className="block"
+                  >
+                    <div
+                      style={{ animationDelay: `${index * 40}ms` }}
+                      className="animate-fade-up"
+                    >
+                      <StationCard
+                        station={station}
+                        isSelected={selectedStationId === station.id}
+                        onSelect={() => selectStation(station)}
+                      />
+                    </div>
+                  </Link>
+                ))
+              )}
+              <div className="h-20 md:h-0" />
             </div>
           </div>
-        </div>
-      )}
 
-      <div className="order-2 flex h-[60%] w-full flex-col rounded-t-3xl bg-surface-strong shadow-soft md:order-1 md:h-full md:w-5/12 lg:w-4/12 md:rounded-none">
-        <div className="md:hidden flex w-full justify-center pt-3 pb-1">
-          <div className="h-1.5 w-12 rounded-full bg-border" />
-        </div>
-        <div className="border-b border-border p-4">
-          <DriverFilters
-            statusFilter={statusFilter}
-            setStatusFilter={setStatusFilter}
-            vehicleType={vehicleType}
-            setVehicleType={setVehicleType}
-            activeTags={activeTags}
-            toggleTag={toggleTag}
-            searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
-            filterTags={driverConfig?.filterTags ?? []}
-            statusOptions={driverConfig?.statusOptions ?? []}
-            vehicleTypeOptions={driverConfig?.vehicleTypeOptions ?? []}
-            searchPlaceholder={driverConfig?.searchPlaceholder ?? ''}
-          />
-          <div className="mt-3 flex items-center justify-between text-xs text-muted">
-            <span>{stations.length} stations</span>
-            {driverConfig?.personalizedLabel && (
-              <span className="flex items-center gap-1">
-                <Filter size={12} /> {driverConfig.personalizedLabel}
-              </span>
+          <div className="relative z-0 isolate order-1 h-[45%] w-full bg-slate-200 md:order-2 md:h-full md:w-7/12 lg:w-8/12">
+            {driverConfig && (
+              <MapCanvas
+                stations={stations}
+                selectedStationId={selectedStationId ?? undefined}
+                onSelectStation={handleSelectStation}
+                onClearSelection={handleClearSelection}
+                userLocation={driverConfig.location}
+                legendItems={driverConfig.legend}
+              />
+            )}
+            {selectedStation && (
+              <>
+                <button
+                  type="button"
+                  aria-label="Close station details"
+                  className="absolute inset-0 z-[450] bg-slate-900/20 md:hidden"
+                  onClick={handleClearSelection}
+                />
+                <StationDetailPanel
+                  station={selectedStation}
+                  availableSlots={availableSlots}
+                  selectedTimeSlot={selectedTimeSlot}
+                  onTimeSlotChange={setSelectedTimeSlot}
+                  selectedDate={selectedDate}
+                  onDateChange={setSelectedDate}
+                  activeTab={activeTab}
+                  onTabChange={setActiveTab}
+                  onClose={handleClearSelection}
+                  onBook={initiateBooking}
+                  onDirections={handleDirections}
+                  onCall={handleCall}
+                  onShare={handleShare}
+                  isLoggedIn={isLoggedIn}
+                  serviceFee={driverConfig?.booking.serviceFee ?? 0}
+                />
+              </>
             )}
           </div>
         </div>
+      </TabsContent>
 
-        <div className="flex-1 space-y-4 overflow-y-auto bg-surface px-4 py-4">
-          {stations.length === 0 ? (
-            <div className="flex h-48 flex-col items-center justify-center text-muted">
-              <Filter size={28} className="mb-2 opacity-60" />
-              <p className="text-sm">No stations found for these filters.</p>
-            </div>
-          ) : (
-            stations.map((station, index) => (
-              <Link
-                key={station.id}
-                to={`/stations/${getStationSlug(station)}`}
-                onClick={() => selectStation(station)}
-                className="block"
-              >
-                <div
-                  style={{ animationDelay: `${index * 40}ms` }}
-                  className="animate-fade-up"
-                >
-                  <StationCard
-                    station={station}
-                    isSelected={selectedStationId === station.id}
-                    onSelect={() => selectStation(station)}
-                  />
-                </div>
-              </Link>
-            ))
-          )}
-          <div className="h-20 md:h-0" />
-        </div>
-      </div>
-
-      <div className="relative z-0 isolate order-1 h-[45%] w-full bg-slate-200 md:order-2 md:h-full md:w-7/12 lg:w-8/12">
-        {driverConfig && (
-          <MapCanvas
-            stations={stations}
-            selectedStationId={selectedStationId ?? undefined}
-            onSelectStation={handleSelectStation}
-            onClearSelection={handleClearSelection}
-            userLocation={driverConfig.location}
-            legendItems={driverConfig.legend}
-          />
-        )}
-        {selectedStation && (
-          <>
-            <button
-              type="button"
-              aria-label="Close station details"
-              className="absolute inset-0 z-[450] bg-slate-900/20 md:hidden"
-              onClick={handleClearSelection}
-            />
-            <StationDetailPanel
-              station={selectedStation}
-              availableSlots={availableSlots}
-              selectedTimeSlot={selectedTimeSlot}
-              onTimeSlotChange={setSelectedTimeSlot}
-              selectedDate={selectedDate}
-              onDateChange={setSelectedDate}
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-              onClose={handleClearSelection}
-              onBook={initiateBooking}
-              onDirections={handleDirections}
-              onCall={handleCall}
-              onShare={handleShare}
-              isLoggedIn={isLoggedIn}
-              serviceFee={driverConfig?.booking.serviceFee ?? 0}
-            />
-          </>
-        )}
-      </div>
-    </div>
+      <TabsContent value="bookings" className="flex-1 min-h-0">
+        <DriverBookingsView
+          isLoggedIn={isLoggedIn}
+          onLoginRequest={onLoginRequest}
+          driverProfileComplete={driverProfileComplete}
+          onRequireDriverProfile={onRequireDriverProfile}
+        />
+      </TabsContent>
+    </Tabs>
   );
 };
 

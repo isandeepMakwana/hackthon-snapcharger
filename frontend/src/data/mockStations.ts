@@ -210,4 +210,23 @@ export const MOCK_HOST_BOOKINGS = [
   }
 ];
 
+export const MOCK_DRIVER_BOOKINGS = [
+  {
+    id: 'driver-booking-1',
+    stationId: '2',
+    stationTitle: 'TechPark Quick Charge',
+    stationLocation: 'Hinjewadi Phase 1, Pune',
+    stationPricePerHour: 200,
+    stationImage: 'https://picsum.photos/400/300?random=2',
+    stationLat: 18.5913,
+    stationLng: 73.7389,
+    hostId: 'host-2',
+    hostName: 'Priya Reddy',
+    hostPhoneNumber: '+919811112244',
+    startTime: '11:00 AM',
+    status: 'ACTIVE' as const,
+    createdAt: '2024-01-02T08:30:00Z'
+  }
+];
+
 export const INITIAL_USER_AVATAR = "https://picsum.photos/100/100?random=99";
