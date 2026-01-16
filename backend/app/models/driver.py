@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 from pydantic import Field
 from app.models.base import CamelModel
@@ -53,3 +54,10 @@ class DriverConfig(CamelModel):
     vehicle_type_options: list[DriverVehicleTypeOption]
     legend: list[DriverLegendItem]
     booking: BookingConfig
+
+
+class StationReview(CamelModel):
+    driver_name: str
+    rating: int
+    review: Optional[str] = None
+    created_at: datetime

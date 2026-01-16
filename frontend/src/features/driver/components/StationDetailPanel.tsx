@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import {
   AlertCircle,
   CalendarClock,
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react';
 import type { Station } from '@/types';
 import { StationStatus } from '@/types';
+import { fetchStationReviews, type StationReview } from '@/services/driverService';
 
 interface StationDetailPanelProps {
   station: Station;
@@ -51,6 +53,11 @@ const StationDetailPanel = ({
   isLoggedIn,
   serviceFee,
 }: StationDetailPanelProps) => {
+  const [reviews, setReviews] = useState<StationReview[]>([]);
+  const [isLoadingReviews, setIsLoadingReviews] = useState(false);
+  const [actualReviewCount, setActualReviewCount] = useState(station.reviewCount);
+  const [actualRating, setActualRating] = useState(station.rating);
+
   const bookedSlots = station.bookedTimeSlots ?? [];
   const isSelectedSlotBooked = selectedTimeSlot ? bookedSlots.includes(selectedTimeSlot) : false;
   const canBook =
@@ -58,6 +65,49 @@ const StationDetailPanel = ({
     !isSelectedSlotBooked &&
     selectedTimeSlot !== '' &&
     selectedDate !== '';
+
+  // Fetch reviews when reviews tab is active
+  useEffect(() => {
+    if (activeTab === 'reviews' && reviews.length === 0) {
+      setIsLoadingReviews(true);
+      fetchStationReviews(station.id)
+        .then((data) => {
+          setReviews(data);
+          // Update the actual review count and rating based on fetched reviews
+          setActualReviewCount(data.length);
+          if (data.length > 0) {
+            const avgRating = data.reduce((sum, r) => sum + r.rating, 0) / data.length;
+            setActualRating(Math.round(avgRating * 10) / 10);
+          }
+        })
+        .catch(() => setReviews([]))
+        .finally(() => setIsLoadingReviews(false));
+    }
+  }, [activeTab, station.id, reviews.length]);
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const formatReviewDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return '1 day ago';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 14) return '1 week ago';
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+    if (diffDays < 60) return '1 month ago';
+    return `${Math.floor(diffDays / 30)} months ago`;
+  };
 
   return (
     <div className="absolute bottom-0 right-0 z-[500] flex h-[85vh] w-full animate-in slide-in-from-bottom-10 flex-col justify-end bg-surface-strong shadow-2xl md:top-0 md:h-full md:w-[380px] md:animate-in md:slide-in-from-right-10">
@@ -96,9 +146,9 @@ const StationDetailPanel = ({
             <h2 className="text-xl font-semibold text-ink">{station.title}</h2>
             <div className="mt-1 flex items-center gap-3 text-sm text-muted">
               <span className="flex items-center gap-1 rounded-full bg-warning/10 px-2 py-0.5 text-warning">
-                <Star size={12} fill="currentColor" /> {station.rating}
+                <Star size={12} fill="currentColor" /> {actualRating.toFixed(1)}
               </span>
-              <span>{station.reviewCount} reviews</span>
+              <span>{actualReviewCount} {actualReviewCount === 1 ? 'review' : 'reviews'}</span>
             </div>
           </div>
 
@@ -244,58 +294,43 @@ const StationDetailPanel = ({
 
           {activeTab === 'reviews' && (
             <div className="space-y-4 text-sm text-muted">
-              <div className="rounded-2xl border border-border bg-surface p-4">
-                <div className="mb-2 flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-600">AS</div>
-                  <div>
-                    <p className="text-sm font-semibold text-ink">Arjun Singh</p>
-                    <div className="flex text-warning">
-                      {Array.from({ length: 5 }).map((_, index) => (
-                        <Star key={index} size={10} fill="currentColor" />
-                      ))}
-                    </div>
-                  </div>
-                  <span className="ml-auto text-xs text-muted">2 days ago</span>
+              {isLoadingReviews ? (
+                <div className="flex h-32 items-center justify-center">
+                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
                 </div>
-                <p className="text-xs text-muted">
-                  Great experience! The host was very helpful and the charging speed was exactly as advertised.
-                </p>
-              </div>
-              <div className="rounded-2xl border border-border bg-surface p-4">
-                <div className="mb-2 flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-600">NK</div>
-                  <div>
-                    <p className="text-sm font-semibold text-ink">Neha Kumar</p>
-                    <div className="flex text-warning">
-                      {Array.from({ length: 4 }).map((_, index) => (
-                        <Star key={index} size={10} fill="currentColor" />
-                      ))}
-                      <Star size={10} className="text-warning" />
-                    </div>
-                  </div>
-                  <span className="ml-auto text-xs text-muted">1 week ago</span>
+              ) : reviews.length === 0 ? (
+                <div className="flex h-32 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-surface text-center">
+                  <Star size={24} className="mb-2 text-muted opacity-60" />
+                  <p className="text-xs text-muted">No reviews yet. Be the first to review!</p>
                 </div>
-                <p className="text-xs text-muted">
-                  Good charger but the approach road is a bit narrow for SUVs. Otherwise perfect.
-                </p>
-              </div>
-              <div className="rounded-2xl border border-border bg-surface p-4">
-                <div className="mb-2 flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-600">RD</div>
-                  <div>
-                    <p className="text-sm font-semibold text-ink">Rahul Dravid</p>
-                    <div className="flex text-warning">
-                      {Array.from({ length: 5 }).map((_, index) => (
-                        <Star key={index} size={10} fill="currentColor" />
-                      ))}
+              ) : (
+                reviews.map((review, index) => (
+                  <div key={index} className="rounded-2xl border border-border bg-surface p-4">
+                    <div className="mb-2 flex items-center gap-2">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-600">
+                        {getInitials(review.driverName)}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-ink">{review.driverName}</p>
+                        <div className="flex text-warning">
+                          {Array.from({ length: 5 }).map((_, starIndex) => (
+                            <Star
+                              key={starIndex}
+                              size={10}
+                              fill={starIndex < review.rating ? 'currentColor' : 'none'}
+                              className={starIndex < review.rating ? 'text-warning' : 'text-slate-300'}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      <span className="ml-auto text-xs text-muted">{formatReviewDate(review.createdAt)}</span>
                     </div>
+                    {review.review && (
+                      <p className="text-xs text-muted">{review.review}</p>
+                    )}
                   </div>
-                  <span className="ml-auto text-xs text-muted">2 weeks ago</span>
-                </div>
-                <p className="text-xs text-muted">
-                  Reliable and fast. Will definitely use again when I'm in the area.
-                </p>
-              </div>
+                ))
+              )}
             </div>
           )}
 
@@ -304,14 +339,14 @@ const StationDetailPanel = ({
               <div className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3">
                 <div className="h-12 w-12 overflow-hidden rounded-full bg-slate-200">
                   <img
-                    src={`https://ui-avatars.com/api/?name=${station.hostName}&background=0D9488&color=fff`}
+                    src={`https://ui-avatars.com/api/?name=${encodeURIComponent(station.hostName)}&background=0D9488&color=fff`}
                     alt={`Host ${station.hostName}`}
                     className="h-full w-full object-cover"
                   />
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-ink">Hosted by {station.hostName}</p>
-                  <p className="text-xs text-muted">Superhost - Joined 2023</p>
+                  <p className="text-xs text-muted">EV Charging Host</p>
                 </div>
               </div>
               <div>

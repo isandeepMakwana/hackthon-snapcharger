@@ -27,5 +27,7 @@ export interface DriverBooking {
   hostPhoneNumber?: string | null;
   startTime?: string | null;
   status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+  rating?: number | null;
+  review?: string | null;
   createdAt: string;
 }

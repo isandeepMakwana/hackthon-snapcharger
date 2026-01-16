@@ -17,9 +17,11 @@ from app.models.driver import (
     DriverLegendItem,
     DriverLocation,
     DriverStatusOption,
-    DriverVehicleTypeOption
+    DriverVehicleTypeOption,
+    StationReview
 )
 from app.models.station import StationOut
+from app.models.booking import CompleteBookingRequest
 
 router = APIRouter(prefix='/api/driver', tags=['driver'])
 
@@ -209,10 +211,109 @@ async def list_driver_bookings(
             host_phone_number=contact_number,
             start_time=booking.start_time,
             status=booking.status,
+            rating=booking.rating,
+            review=booking.review,
             created_at=booking.created_at
         ))
 
     return results
+
+
+@router.post('/bookings/complete', response_model=DriverBookingOut)
+async def complete_booking(
+    payload: CompleteBookingRequest,
+    current_user: User = Depends(require_driver_profile),
+    db: Session = Depends(get_db)
+) -> DriverBookingOut:
+    # Validate rating
+    if payload.rating < 1 or payload.rating > 5:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={'code': 'INVALID_RATING', 'message': 'Rating must be between 1 and 5.'}
+        )
+
+    # Find booking
+    booking = db.query(Booking).filter(
+        Booking.id == payload.booking_id,
+        Booking.driver_id == current_user.id
+    ).first()
+
+    if not booking:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={'code': 'NOT_FOUND', 'message': 'Booking not found.'}
+        )
+
+    if booking.status == 'COMPLETED':
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={'code': 'ALREADY_COMPLETED', 'message': 'Booking is already completed.'}
+        )
+
+    if booking.status == 'CANCELLED':
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={'code': 'CANCELLED', 'message': 'Cannot complete a cancelled booking.'}
+        )
+
+    # Update booking
+    booking.status = 'COMPLETED'
+    booking.rating = payload.rating
+    booking.review = payload.review
+
+    # Commit the booking first so it's included in the count
+    db.commit()
+    db.refresh(booking)
+
+    # Get station and host info
+    station = db.query(Station).filter(Station.id == booking.station_id).first()
+    if not station:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={'code': 'STATION_NOT_FOUND', 'message': 'Station not found.'}
+        )
+
+    # Update station review count and average rating
+    completed_bookings = db.query(Booking).filter(
+        Booking.station_id == station.id,
+        Booking.status == 'COMPLETED',
+        Booking.rating.isnot(None)
+    ).all()
+    
+    if completed_bookings:
+        total_rating = sum(b.rating for b in completed_bookings if b.rating)
+        station.review_count = len(completed_bookings)
+        station.rating = round(total_rating / len(completed_bookings), 1)
+
+    host = db.query(User).filter(User.id == station.host_id).first()
+    if not host:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={'code': 'HOST_NOT_FOUND', 'message': 'Host not found.'}
+        )
+
+    db.commit()
+    db.refresh(station)
+
+    contact_number = station.phone_number or host.phone_number
+    return DriverBookingOut(
+        id=booking.id,
+        station_id=station.id,
+        station_title=station.title,
+        station_location=station.location,
+        station_price_per_hour=station.price_per_hour,
+        station_image=station.image,
+        station_lat=station.lat,
+        station_lng=station.lng,
+        host_id=station.host_id,
+        host_name=station.host_name,
+        host_phone_number=contact_number,
+        start_time=booking.start_time,
+        status=booking.status,
+        rating=booking.rating,
+        review=booking.review,
+        created_at=booking.created_at
+    )
 
 
 @router.post('/bookings', response_model=StationOut)
@@ -282,3 +383,26 @@ async def create_booking(
 
     booked_slots = _fetch_booked_slots(db, [station.id])
     return build_station_out(station, distance_value, booked_slots.get(station.id, []))
+
+
+@router.get('/stations/{station_id}/reviews', response_model=list[StationReview])
+async def get_station_reviews(
+    station_id: str,
+    db: Session = Depends(get_db)
+) -> list[StationReview]:
+    """Get all reviews for a specific station"""
+    reviews = db.query(Booking).filter(
+        Booking.station_id == station_id,
+        Booking.status == 'COMPLETED',
+        Booking.rating.isnot(None)
+    ).order_by(Booking.created_at.desc()).all()
+
+    return [
+        StationReview(
+            driver_name=booking.driver_name,
+            rating=booking.rating,
+            review=booking.review,
+            created_at=booking.created_at
+        )
+        for booking in reviews
+    ]
