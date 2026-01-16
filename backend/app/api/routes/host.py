@@ -1,4 +1,6 @@
+from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from starlette import status
 from app.api.deps import get_db, require_host_profile
@@ -25,9 +27,11 @@ async def get_stats(
         return HostStats(total_earnings=0, active_bookings=0, station_health=0)
 
     total_earnings = sum(station.monthly_earnings for station in stations)
+    today = date.today()
     active_bookings = db.query(Booking).filter(
         Booking.host_id == current_user.id,
-        Booking.status == 'ACTIVE'
+        Booking.status == 'ACTIVE',
+        or_(Booking.booking_date.is_(None), Booking.booking_date >= today)
     ).count()
     online = sum(1 for station in stations if station.status != StationStatus.OFFLINE.value)
     station_health = round((online / len(stations)) * 100)
@@ -79,6 +83,7 @@ async def create_station(
         lng=payload.lng,
         phone_number=station_phone,
         supported_vehicle_types=payload.supported_vehicle_types,
+        blocked_time_slots=payload.blocked_time_slots,
         monthly_earnings=payload.monthly_earnings
     )
     db.add(station)
@@ -110,6 +115,7 @@ async def list_bookings(
             driver_id=booking.driver_id,
             driver_name=booking.driver_name,
             driver_phone_number=booking.driver_phone_number,
+            booking_date=booking.booking_date,
             start_time=booking.start_time,
             status=booking.status,
             created_at=booking.created_at

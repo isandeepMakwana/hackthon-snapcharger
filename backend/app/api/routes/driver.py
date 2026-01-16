@@ -1,5 +1,6 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date, time
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette import status
 from app.api.deps import get_db, require_driver_profile
@@ -54,12 +55,17 @@ LEGEND_ITEMS = [
 ]
 
 
-def _fetch_booked_slots(db: Session, station_ids: list[str]) -> dict[str, list[str]]:
+def _fetch_booked_slots(
+    db: Session,
+    station_ids: list[str],
+    booking_date: date
+) -> dict[str, list[str]]:
     if not station_ids:
         return {}
     bookings = db.query(Booking).filter(
         Booking.station_id.in_(station_ids),
-        Booking.status == 'ACTIVE'
+        Booking.status == 'ACTIVE',
+        Booking.booking_date == booking_date
     ).all()
     slots: dict[str, list[str]] = {}
     for booking in bookings:
@@ -69,16 +75,12 @@ def _fetch_booked_slots(db: Session, station_ids: list[str]) -> dict[str, list[s
     return slots
 
 
-def _generate_time_slots(
-    slot_count: int = 6,
-    interval_minutes: int = 60,
-    start_offset_minutes: int = 60
-) -> list[str]:
+def _generate_time_slots() -> list[str]:
     slots: list[str] = []
-    current = datetime.now() + timedelta(minutes=start_offset_minutes)
-    for _ in range(slot_count):
+    start_time = datetime.combine(date.today(), time(hour=8, minute=0))
+    for offset in range(12):
+        current = start_time + timedelta(hours=offset)
         slots.append(current.strftime('%I:%M %p').lstrip('0'))
-        current += timedelta(minutes=interval_minutes)
     return slots
 
 
@@ -109,10 +111,12 @@ async def search_stations(
     vehicle_type: str | None = Query(default=None),
     tags: list[str] | None = Query(default=None),
     q: str | None = Query(default=None),
+    booking_date: date | None = Query(default=None),
     db: Session = Depends(get_db)
 ) -> list[StationOut]:
     ensure_global_demo_stations(db)
     stations = db.query(Station).all()
+    selected_date = booking_date or date.today()
 
     if status and status != 'ALL':
         stations = [station for station in stations if station.status == status]
@@ -164,9 +168,10 @@ async def search_stations(
         if dist <= radius_km:
             candidates.append((station, dist))
 
-    booked_slots = _fetch_booked_slots(db, [station.id for station, _ in candidates])
+    booked_slots = _fetch_booked_slots(db, [station.id for station, _ in candidates], selected_date)
     for station, dist in candidates:
-        results.append(build_station_out(station, dist, booked_slots.get(station.id, [])))
+        merged_slots = list({*booked_slots.get(station.id, []), *(station.blocked_time_slots or [])})
+        results.append(build_station_out(station, dist, merged_slots))
 
     return results
 
@@ -196,16 +201,34 @@ async def create_booking(
             detail={'code': 'UNAVAILABLE', 'message': 'Station is not available.'}
         )
 
+    if not payload.booking_date:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={'code': 'MISSING_BOOKING_DATE', 'message': 'Booking date is required.'}
+        )
+    if payload.booking_date < date.today():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={'code': 'INVALID_BOOKING_DATE', 'message': 'Booking date cannot be in the past.'}
+        )
+
     if not payload.start_time:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={'code': 'MISSING_TIME_SLOT', 'message': 'Start time is required to book a station.'}
         )
 
+    if payload.start_time in (station.blocked_time_slots or []):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={'code': 'TIME_SLOT_BLOCKED', 'message': 'Selected time slot is blocked by the host.'}
+        )
+
     existing_booking = db.query(Booking).filter(
         Booking.station_id == station.id,
         Booking.status == 'ACTIVE',
-        Booking.start_time == payload.start_time
+        Booking.start_time == payload.start_time,
+        Booking.booking_date == payload.booking_date
     ).first()
     if existing_booking:
         raise HTTPException(
@@ -225,16 +248,25 @@ async def create_booking(
         driver_name=current_user.username,
         driver_phone_number=current_user.phone_number,
         status='ACTIVE',
+        booking_date=payload.booking_date,
         start_time=payload.start_time
     ))
 
     station.monthly_earnings += station.price_per_hour
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={'code': 'TIME_SLOT_UNAVAILABLE', 'message': 'Selected time slot is already booked.'}
+        )
     db.refresh(station)
 
     distance_value = None
     if payload.user_lat is not None and payload.user_lng is not None:
         distance_value = distance_km(payload.user_lat, payload.user_lng, station.lat, station.lng)
 
-    booked_slots = _fetch_booked_slots(db, [station.id])
-    return build_station_out(station, distance_value, booked_slots.get(station.id, []))
+    booked_slots = _fetch_booked_slots(db, [station.id], payload.booking_date)
+    merged_slots = list({*booked_slots.get(station.id, []), *(station.blocked_time_slots or [])})
+    return build_station_out(station, distance_value, merged_slots)

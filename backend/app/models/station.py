@@ -28,6 +28,7 @@ class StationCreate(CamelModel):
     phone_number: Optional[str] = Field(default=None, max_length=30)
     host_name: Optional[str] = Field(default=None, max_length=120)
     supported_vehicle_types: list[str] = Field(default_factory=lambda: ['2W', '4W'])
+    blocked_time_slots: list[str] = Field(default_factory=list)
     rating: float = Field(default=0.0, ge=0, le=5)
     review_count: int = Field(default=0, ge=0)
     status: StationStatus = StationStatus.AVAILABLE
@@ -46,6 +47,7 @@ class StationUpdate(CamelModel):
     lng: Optional[float] = None
     phone_number: Optional[str] = Field(default=None, max_length=30)
     supported_vehicle_types: Optional[list[str]] = None
+    blocked_time_slots: Optional[list[str]] = None
     rating: Optional[float] = Field(default=None, ge=0, le=5)
     review_count: Optional[int] = Field(default=None, ge=0)
     status: Optional[StationStatus] = None
@@ -72,6 +74,7 @@ class StationOut(CamelModel):
     phone_number: Optional[str] = None
     supported_vehicle_types: list[str] = Field(default_factory=list)
     booked_time_slots: list[str] = Field(default_factory=list)
+    blocked_time_slots: list[str] = Field(default_factory=list)
 
 
 class HostStats(CamelModel):

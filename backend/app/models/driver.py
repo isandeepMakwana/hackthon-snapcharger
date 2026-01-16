@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Optional
 from pydantic import Field
 from app.models.base import CamelModel
@@ -5,6 +6,7 @@ from app.models.base import CamelModel
 
 class BookingRequest(CamelModel):
     station_id: str = Field(min_length=1)
+    booking_date: date
     start_time: Optional[str] = None
     user_lat: Optional[float] = None
     user_lng: Optional[float] = None

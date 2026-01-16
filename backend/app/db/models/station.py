@@ -29,6 +29,11 @@ class Station(Base):
         default=lambda: ['2W', '4W'],
         nullable=False
     )
+    blocked_time_slots: Mapped[list] = mapped_column(
+        JSON,
+        default=list,
+        nullable=False
+    )
     monthly_earnings: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
