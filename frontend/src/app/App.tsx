@@ -278,6 +278,8 @@ const AppShell = () => {
     };
   }, [setViewMode]);
 
+  // Only auto-switch to driver view if user navigates directly to a station URL
+  // Don't interfere with manual tab switches
   useEffect(() => {
     if ((stationSlug || stationId || stationRef) && viewMode !== 'driver') {
       setViewMode('driver');

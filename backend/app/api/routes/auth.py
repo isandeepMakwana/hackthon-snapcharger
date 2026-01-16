@@ -6,7 +6,6 @@ from app.api.deps import get_db, get_current_user
 from app.api.utils.users import build_user_out
 from app.core.config import get_settings
 from app.core.mailer import send_password_reset_email, send_verification_email
-from app.core.rate_limit import rate_limit
 from app.db.models.email_verification import EmailVerificationToken
 from app.db.models.password_reset import PasswordResetToken
 from app.db.models.session import Session as DbSession
@@ -34,8 +33,7 @@ router = APIRouter(prefix='/api/auth', tags=['auth'])
 @router.post(
     '/register',
     response_model=AuthResponse,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(rate_limit(settings.rate_limit_register_max, settings.rate_limit_window_seconds))]
+    status_code=status.HTTP_201_CREATED
 )
 async def register(
     payload: RegisterRequest,
@@ -102,8 +100,7 @@ async def register(
 
 @router.post(
     '/login',
-    response_model=AuthResponse,
-    dependencies=[Depends(rate_limit(settings.rate_limit_login_max, settings.rate_limit_window_seconds))]
+    response_model=AuthResponse
 )
 async def login(
     payload: LoginRequest,
@@ -223,8 +220,7 @@ async def verify_email(token: str, db: Session = Depends(get_db)) -> EmailVerifi
 
 @router.post(
     '/forgot-password',
-    response_model=MessageResponse,
-    dependencies=[Depends(rate_limit(settings.rate_limit_reset_max, settings.rate_limit_window_seconds))]
+    response_model=MessageResponse
 )
 async def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)) -> MessageResponse:
     user = db.query(User).filter(User.email == payload.email.lower()).first()
@@ -247,8 +243,7 @@ async def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(
 
 @router.post(
     '/reset-password',
-    response_model=MessageResponse,
-    dependencies=[Depends(rate_limit(settings.rate_limit_reset_max, settings.rate_limit_window_seconds))]
+    response_model=MessageResponse
 )
 async def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)) -> MessageResponse:
     token_hash = hash_token(payload.token)

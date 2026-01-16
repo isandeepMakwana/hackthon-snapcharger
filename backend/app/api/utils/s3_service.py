@@ -32,6 +32,8 @@ def upload_file_to_s3(file_obj, object_name: str) -> str | None:
         # Reset pointer to start of file stream
         file_obj.seek(0)
         
+        logger.info(f"📤 Uploading {object_name} to S3 bucket {BUCKET_NAME}...")
+        
         # Upload
         s3_client.upload_fileobj(
             file_obj,
@@ -49,6 +51,14 @@ def upload_file_to_s3(file_obj, object_name: str) -> str | None:
         url = f"https://{BUCKET_NAME}.s3.{region}.amazonaws.com/{object_name}"
         
         logger.info(f"✅ S3 Upload Success: {url}")
+        
+        # Verify the file exists by checking if we can get its metadata
+        try:
+            s3_client.head_object(Bucket=BUCKET_NAME, Key=object_name)
+            logger.info(f"✅ Verified file exists in S3: {object_name}")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not verify file in S3: {e}")
+        
         return url
 
     except NoCredentialsError:

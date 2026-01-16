@@ -59,6 +59,7 @@ const DriverView = ({
   const [activeTags, setActiveTags] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSection, setActiveSection] = useState<'discover' | 'bookings'>('discover');
+  const [searchRadius, setSearchRadius] = useState(10);
 
   const selectedStation = useMemo(
     () => stations.find((station) => station.id === selectedStationId) || null,
@@ -208,7 +209,7 @@ const DriverView = ({
         const data = await fetchDriverStations({
           lat: driverConfig.location.lat,
           lng: driverConfig.location.lng,
-          radiusKm: driverConfig.searchRadiusKm,
+          radiusKm: searchRadius,
           status: statusFilter,
           vehicleType,
           tags: activeTags,
@@ -225,7 +226,7 @@ const DriverView = ({
     const delay = searchQuery.trim() ? 300 : 0;
     const timeout = window.setTimeout(fetchStations, delay);
     return () => window.clearTimeout(timeout);
-  }, [driverConfig, statusFilter, vehicleType, activeTags, searchQuery, selectedDate, loadStations]);
+  }, [driverConfig, statusFilter, vehicleType, activeTags, searchQuery, selectedDate, searchRadius, loadStations]);
 
   useEffect(() => {
     if (!selectedStationId) return;
@@ -451,6 +452,27 @@ const DriverView = ({
                 vehicleTypeOptions={driverConfig?.vehicleTypeOptions ?? []}
                 searchPlaceholder={driverConfig?.searchPlaceholder ?? ''}
               />
+              <div className="mt-3 flex items-center gap-3">
+                <label htmlFor="radius-input" className="text-xs text-muted whitespace-nowrap">
+                  Radius (km):
+                </label>
+                <input
+                  id="radius-input"
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={searchRadius}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    if (!isNaN(val) && val >= 1 && val <= 100) {
+                      setSearchRadius(val);
+                    } else if (e.target.value === '') {
+                      setSearchRadius(10);
+                    }
+                  }}
+                  className="w-20 rounded-lg border border-border bg-surface px-2 py-1 text-xs text-ink focus:border-accent focus:outline-none"
+                />
+              </div>
               <div className="mt-3 flex items-center justify-between text-xs text-muted">
                 <span>{stations.length} stations</span>
                 {driverConfig?.personalizedLabel && (

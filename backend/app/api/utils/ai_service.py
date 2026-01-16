@@ -6,94 +6,51 @@ import logging
 from PIL import Image, ImageOps
 from dotenv import load_dotenv
 
-# Setup Production Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 load_dotenv()
-
-# Configuration Validation
-API_KEY = os.getenv("GOOGLE_API_KEY")
-if not API_KEY:
-    logger.error("GOOGLE_API_KEY is missing from environment variables.")
-    raise ValueError("Missing GOOGLE_API_KEY")
-
-genai.configure(api_key=API_KEY)
-
-# Use Flash for low latency, or Pro for complex reasoning
-# 'gemini-1.5-flash' is the best for high-volume production
-MODEL_NAME = 'gemini-2.5-flash' 
-model = genai.GenerativeModel(MODEL_NAME)
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+model = genai.GenerativeModel('gemini-2.5-flash')
 
 def optimize_image_for_gemini(image_bytes: bytes, target_size=(1024, 1024), quality=85) -> bytes:
-    """
-    PRODUCTION PIPELINE:
-    1. Sanitize: Handles PNG, WebP, HEIC (if supported), and stripped metadata.
-    2. Normalize: Converts to RGB (standard 3-channel).
-    3. Smart Resize: Fits within 1024x1024 (Gemini's 4-tile boundary) to cap token usage.
-    4. Compress: Outputs optimized JPEG to reduce network latency.
-    """
+    """Optimizes image to reduce token usage and latency."""
     try:
-
         with Image.open(io.BytesIO(image_bytes)) as img:
-            # Auto-rotate based on EXIF (common bug with phone camera uploads)
             img = ImageOps.exif_transpose(img)
-            
-            # Convert to standard RGB (fixes PNG transparency/RGBA issues)
             if img.mode != 'RGB':
                 img = img.convert('RGB')
-            
-            # Smart Resize: Maintain aspect ratio, but cap max dimension
-            # This ensures we don't accidentally send a 4000px image (costing $$$ in tokens)
             img.thumbnail(target_size, Image.Resampling.LANCZOS)
-            
-            # Save to buffer as optimized JPEG
             output_buffer = io.BytesIO()
-            img.save(
-                output_buffer, 
-                format='JPEG', 
-                quality=quality, 
-                optimize=True,
-                subsampling=0 # Keeps sharp edges for text (important for labels)
-            )
-            
-            optimized_size = output_buffer.getbuffer().nbytes
-            original_size = len(image_bytes)
-            logger.info(f"Image Optimized: {original_size/1024:.1f}KB -> {optimized_size/1024:.1f}KB")
-            
+            img.save(output_buffer, format='JPEG', quality=quality, optimize=True)
             return output_buffer.getvalue()
-            
     except Exception as e:
-        logger.warning(f"Image Optimization Failed: {e}. Using original bytes.")
+        logger.warning(f"Image Optimization Failed: {e}")
         return image_bytes
 
-async def analyze_charger_image(raw_image_bytes: bytes):
+async def analyze_multiple_images(image_byte_list: list[bytes]):
     """
-    Full AI Pipeline: Upload -> Optimize -> Tokenize -> Analyze
+    Analyzes MULTIPLE images in a SINGLE request so Gemini can 'synthesize' them.
     """
     
-    # 1. Run Internal Optimization Pipeline
-    jpeg_bytes = optimize_image_for_gemini(raw_image_bytes)
+    # 1. Prepare Content List: [Prompt, Image1, Image2, Image3]
+    content_payload = []
     
-    # 2. Define Strict JSON Schema Prompt
-    # We ask for a "confidence_score" to flag manual reviews in production
+    # Add the Prompt first
     prompt = """
         You are an expert **EV Infrastructure Auditor** for "SnapCharge". 
-        Your task is to analyze a **set of images** representing a **SINGLE** charging station and synthesize them into one technical report.
+        Your task is to analyze a **set of images** representing a **SINGLE** charging station location and extract technical specifications.
 
-        ### MULTI-IMAGE SYNTHESIS STRATEGY (Read Carefully):
-        You may receive multiple images (e.g., a wide shot, a close-up, a label photo). 
-        **DO NOT analyze them in isolation.** Treat them as pieces of a single puzzle.
-        1. **Best Evidence Rule**: If Image A is blurry but Image B is clear, **ignore Image A** and derive data from Image B.
-        2. **Aggregated Details**: 
-        - *Example*: If Image 1 shows the "Socket Shape" and Image 2 shows the "Specification Sticker", combine these facts into the final JSON.
-        - You do not need all details to be present in every single image. As long as a detail appears clearly in **at least one** image, capture it.
-        3. **Conflict Resolution**: If images seem to contradict, prioritize the image containing **readable text/labels** over visual estimation.
+        ### SELECTIVE EXTRACTION STRATEGY (Critical):
+        You may receive a mix of images (e.g., a petrol pump, a wide street view, and a specific EV charger).
+        1. **Relevance Filter**: Scan all images. **Ignore** images that ONLY show petrol pumps, trees, or generic buildings *IF* another image shows an EV Charger.
+        2. **Targeted Extraction**: Extract technical details (Socket Type, Power) *only* from the images containing actual EV equipment. 
+        3. **Fall-back**: Only report "No Charger Found" if **ZERO** images contain EV equipment.
 
-        ### ANALYSIS STEPS:
-        1. **Scan for Labels (Highest Priority)**: Search ALL images for a nameplate or sticker. EXTRACT exact Voltage (V), Amperage (A), or Power (kW).
-        2. **Visual Identification**: Identify the connector shape from the clearest available image using the matrix below.
-        3. **Safety Scan**: Check ALL images for hazards (burn marks, rust, exposed wires). If ANY image shows a hazard, mark `is_safe: false`.
+        ### ANALYSIS PROTOCOL:
+        1. **Scan for Labels**: Search ALL images for a nameplate/sticker. EXTRACT Voltage (V), Amperage (A), or Power (kW).
+        2. **Visual Identification**: Identify the connector shape from the clearest image showing a socket.
+        3. **Safety Scan**: Check only the relevant EV equipment for hazards (burns, rust, exposed wires).
 
         ### TECHNICAL DECISION MATRIX:
         | Visual Cue | Type Enum | Max Power | Vehicle Support |
@@ -105,63 +62,42 @@ async def analyze_charger_image(raw_image_bytes: bytes):
         | Round "Shower Head" | `GB_T` | ~15.0 kW | `["4W"]` |
 
         ### HALLUCINATION CONTROLS:
-        - **Partial Data is OK**: If you can only identify the Socket Type but not the exact Power, fill `socket_type` and use the "Conservative Minimum" for power.
-        - **Unsure?**: If NO image provides a clear view of the socket or label, return `socket_type: "UNKNOWN"`.
-        - **Description**: `marketing_description` must be a synthesis of the best available visual data (e.g., "3.3kW 3-pin socket located in a domestic setting").
+        - **Partial Data is OK**: If you see a socket but no label, fill `socket_type` and use the "Conservative Minimum" for power.
+        - **Unsure?**: If NO image contains EV equipment, set `socket_type: "UNKNOWN"` and `confidence_score: 0.0`.
+        - **Description**: `marketing_description` must be based ONLY on the identified EV equipment (e.g. "50kW CCS2 charger available at fuel station").
 
         ### OUTPUT FORMAT:
         Return **ONLY** a single raw JSON object (no markdown, no code blocks):
-        {{
+        {
         "socket_type": "Enum",
         "power_kw": Float,
         "is_safe": Boolean,
         "marketing_description": "String",
         "confidence_score": Float (0.0 to 1.0),
         "vehicle_compatibility": ["String"],
-        "visual_evidence": "String (Explain your source: 'Extracted 7.2kW from label in Image 2' or 'Identified 3-pin shape in Image 1')"
-        }}
-        """
+        "visual_evidence": "String (Explain: 'Ignored Image 2 (Petrol Pump), found CCS2 socket in Image 1')"
+        }
+    """
+    content_payload.append(prompt)
     
+    # Add Images
+    for jpeg_bytes in image_byte_list:
+        content_payload.append({
+            "mime_type": "image/jpeg", 
+            "data": jpeg_bytes
+        })
+
     try:
-        # 3. Call Gemini with MIME type enforcement
-        response = model.generate_content([
-            prompt,
-            {"mime_type": "image/jpeg", "data": jpeg_bytes}
-        ])
+        # 2. Call Gemini with the LIST of contents
+        response = model.generate_content(content_payload)
         
-        # 4. Usage Metrics (For Monitoring)
-        if hasattr(response, 'usage_metadata'):
-            usage = response.usage_metadata
-            
-            # Extract specific counts (default to 0 if missing)
-            prompt_tokens = usage.prompt_token_count
-            cached_tokens = getattr(usage, 'cached_content_token_count', 0)
-            output_tokens = usage.candidates_token_count
-            total_tokens = usage.total_token_count
-            
-            logger.info(f"📊 TOKEN USAGE REPORT:")
-            logger.info(f"   • Input (Prompt):  {prompt_tokens}")
-            logger.info(f"   • Cached Input:    {cached_tokens} (Money Saved!)")
-            logger.info(f"   • Output (Model):  {output_tokens}")
-            logger.info(f"   • Total Billed:    {total_tokens}")
-        # 5. Robust JSON Parsing
+        # 3. Parse Response
         text_response = response.text.strip()
-        # Strip ```json fences if model adds them
         if text_response.startswith("```"):
             text_response = text_response.strip("`").replace("json\n", "").replace("json", "")
             
         return json.loads(text_response)
         
-    except json.JSONDecodeError:
-        logger.error("Gemini returned invalid JSON.")
-        return None
     except Exception as e:
-        logger.error(f"Gemini API Error: {e}")
-        # Return specific error state for frontend handling
-        return {
-            "socket_type": "UNKNOWN",
-            "vehicle_compatibility": ["UNKNOWN"],
-            "detected_address": None,
-            "error": "AI Analysis Failed",
-            "marketing_description": "Manual verification required."
-        }
+        logger.error(f"Gemini Analysis Error: {e}")
+        return None

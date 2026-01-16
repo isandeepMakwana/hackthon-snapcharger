@@ -132,7 +132,8 @@ const MapCanvas = ({
     if (!mapInstanceRef.current || !selectedStationId) return;
     const station = stations.find((item) => item.id === selectedStationId);
     if (!station) return;
-    mapInstanceRef.current.flyTo([station.lat, station.lng], 15, { animate: true, duration: 1 });
+    // Pan to station without changing zoom level to keep all stations visible
+    mapInstanceRef.current.panTo([station.lat, station.lng], { animate: true, duration: 1 });
   }, [selectedStationId, stations]);
 
   const handleRecenter = () => {

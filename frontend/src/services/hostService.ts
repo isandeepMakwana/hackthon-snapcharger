@@ -81,7 +81,9 @@ export const updateHostStation = async (stationId: string, payload: Partial<Stat
   });
 };
 
-export const analyzeHostPhoto = async (file: File): Promise<any> => {
+export const analyzeHostPhoto = async (files: File | File[]): Promise<any> => {
+  const fileArray = Array.isArray(files) ? files : [files];
+  
   const response = await fetch(`${getApiBaseUrl()}/api/host/analyze-photo`, {
     method: 'POST',
     headers: {
@@ -89,7 +91,10 @@ export const analyzeHostPhoto = async (file: File): Promise<any> => {
     },
     body: (() => {
       const form = new FormData();
-      form.append('file', file);
+      // Append all files with the same field name 'files'
+      fileArray.forEach(file => {
+        form.append('files', file);
+      });
       return form;
     })()
   });
