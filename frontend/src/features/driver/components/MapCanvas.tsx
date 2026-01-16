@@ -145,7 +145,7 @@ const MapCanvas = ({
       >
         <Crosshair size={20} />
       </button>
-      <div className="absolute left-4 top-4 hidden items-center gap-3 rounded-2xl border border-border bg-surface/90 px-3 py-2 text-xs font-semibold text-muted backdrop-blur md:flex">
+      <div className="absolute left-4 top-4 z-[900] hidden items-center gap-3 rounded-2xl border border-border bg-surface/90 px-3 py-2 text-xs font-semibold text-muted backdrop-blur md:flex">
         <span className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-full bg-accent shadow-[0_0_0_2px_rgba(16,185,129,0.2)]" />
           Available

@@ -325,7 +325,7 @@ const DriverView = ({
         </div>
       </div>
 
-      <div className="order-1 h-[45%] w-full bg-slate-200 md:order-2 md:h-full md:w-7/12 lg:w-8/12">
+      <div className="relative z-0 isolate order-1 h-[45%] w-full bg-slate-200 md:order-2 md:h-full md:w-7/12 lg:w-8/12">
         <MapCanvas
           stations={filteredStations}
           selectedStationId={selectedStationId ?? undefined}

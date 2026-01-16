@@ -78,13 +78,8 @@ const App = () => {
     await requestPasswordReset(email);
   };
 
-  const handleLogout = async () => {
-    if (authSession?.refreshToken) {
-      try {
-        await logoutSession(authSession.refreshToken);
-      } catch {
-      }
-    }
+  const handleLogout = () => {
+    const refreshToken = authSession?.refreshToken;
     clearAuthSession();
     setAuthSession(null);
     setAuthState('guest');
@@ -92,6 +87,10 @@ const App = () => {
     setLoginIntent('general');
     setPendingBookingStationId(null);
     setViewMode('driver');
+
+    if (refreshToken) {
+      void logoutSession(refreshToken).catch(() => {});
+    }
   };
 
   const handleViewModeChange = (mode: 'driver' | 'host') => {
