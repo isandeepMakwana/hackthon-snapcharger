@@ -1,27 +1,69 @@
-import { useState } from 'react';
-import { ArrowRight, Loader2, Lock, Mail, Zap } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ArrowRight, Car, Home, Loader2, Lock, Mail, Zap } from 'lucide-react';
 
 interface LoginPageProps {
-  onLogin: (role: 'driver' | 'host') => void;
+  onLogin: (payload: { role: 'driver' | 'host'; email: string; password: string }) => Promise<void>;
+  onForgotPassword?: (email: string) => Promise<void>;
   onNavigateToRegister: () => void;
   notice?: string;
   defaultRole?: 'driver' | 'host';
 }
 
-const LoginPage = ({ onLogin, onNavigateToRegister, notice, defaultRole }: LoginPageProps) => {
-  const role: 'driver' | 'host' = defaultRole ?? 'driver';
+const LoginPage = ({
+  onLogin,
+  onForgotPassword,
+  onNavigateToRegister,
+  notice,
+  defaultRole,
+}: LoginPageProps) => {
+  const [role, setRole] = useState<'driver' | 'host'>(defaultRole ?? 'driver');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const handleSubmit = (event: React.FormEvent) => {
+  useEffect(() => {
+    if (!defaultRole) return;
+    setRole(defaultRole);
+  }, [defaultRole]);
+
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setIsLoading(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
 
-    setTimeout(() => {
+    try {
+      await onLogin({ role, email, password });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to sign in. Please try again.';
+      setErrorMessage(message);
+    } finally {
       setIsLoading(false);
-      onLogin(role);
-    }, 1200);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!onForgotPassword) {
+      return;
+    }
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    if (!email.trim()) {
+      setErrorMessage('Enter your email to request a password reset.');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await onForgotPassword(email.trim());
+      setSuccessMessage('Password reset instructions sent. Check your inbox.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to request a reset.';
+      setErrorMessage(message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -44,6 +86,44 @@ const LoginPage = ({ onLogin, onNavigateToRegister, notice, defaultRole }: Login
           )}
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setRole('driver')}
+                disabled={isLoading}
+                className={`flex flex-col items-center gap-2 rounded-2xl border-2 p-3 text-sm font-semibold transition ${
+                  role === 'driver'
+                    ? 'border-accent bg-accent-soft text-ink'
+                    : 'border-border text-muted hover:border-accent/40'
+                }`}
+              >
+                <Car size={20} className={role === 'driver' ? 'text-accent' : 'text-muted'} />
+                Driver
+              </button>
+              <button
+                type="button"
+                onClick={() => setRole('host')}
+                disabled={isLoading}
+                className={`flex flex-col items-center gap-2 rounded-2xl border-2 p-3 text-sm font-semibold transition ${
+                  role === 'host'
+                    ? 'border-accent bg-accent-soft text-ink'
+                    : 'border-border text-muted hover:border-accent/40'
+                }`}
+              >
+                <Home size={20} className={role === 'host' ? 'text-accent' : 'text-muted'} />
+                Host
+              </button>
+            </div>
+            {errorMessage && (
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {errorMessage}
+              </div>
+            )}
+            {successMessage && (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                {successMessage}
+              </div>
+            )}
             <div className="space-y-1">
               <label className="text-xs font-semibold uppercase text-muted" htmlFor="login-email">
                 Email address
@@ -81,7 +161,12 @@ const LoginPage = ({ onLogin, onNavigateToRegister, notice, defaultRole }: Login
             </div>
 
             <div className="flex justify-end">
-              <button type="button" className="text-xs font-semibold text-accent hover:text-accent-strong">
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                disabled={isLoading || !onForgotPassword}
+                className="text-xs font-semibold text-accent hover:text-accent-strong"
+              >
                 Forgot password?
               </button>
             </div>

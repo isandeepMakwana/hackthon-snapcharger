@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Camera, Check, Sparkles, X } from 'lucide-react';
 import { analyzeChargerImage } from '@/services/geminiService';
+import { analyzeHostPhoto } from '@/services/hostService';
 import type { GeminiAnalysisResult, Station } from '@/types';
 
 interface AddStationModalProps {
@@ -77,6 +78,34 @@ const AddStationModal = ({
 
   if (!isOpen) return null;
 
+  const mapBackendResultToGemini = (backendResult: any): GeminiAnalysisResult => {
+    const connectorMap: Record<string, string> = {
+      SOCKET_16A_3PIN: '16A 3-pin',
+      TYPE_2_AC: 'Type 2 (AC)',
+      CCS_2_DC: 'CCS2 (DC)',
+      UNKNOWN: 'Unknown',
+    };
+
+    const socketType = backendResult.socket_type as string | undefined;
+    const connectorType = socketType ? connectorMap[socketType] || socketType : 'Unknown';
+
+    const powerKw = typeof backendResult.power_kw === 'number' ? backendResult.power_kw : 0;
+    const powerOutput = powerKw > 0 ? `${powerKw}kW` : '';
+
+    const description =
+      typeof backendResult.marketing_description === 'string'
+        ? backendResult.marketing_description
+        : 'AI analysis completed for this charger.';
+
+    return {
+      connectorType,
+      powerOutput,
+      suggestedTitle: connectorType ? `${connectorType} charger` : 'EV charger',
+      suggestedDescription: description,
+      confidence: 0.9,
+    };
+  };
+
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -86,7 +115,22 @@ const AddStationModal = ({
     reader.readAsDataURL(file);
 
     setStep('analyzing');
-    const result = await analyzeChargerImage(file);
+    let result: GeminiAnalysisResult | null = null;
+
+    try {
+      const backendJson = await analyzeHostPhoto(file);
+      if (backendJson && backendJson.ai_data) {
+        result = mapBackendResultToGemini(backendJson.ai_data);
+      } else {
+        result = mapBackendResultToGemini(backendJson);
+      }
+    } catch (error) {
+      console.error('Backend AI analysis failed, falling back to direct Gemini:', error);
+    }
+
+    if (!result) {
+      result = await analyzeChargerImage(file);
+    }
 
     setAnalysisData(result);
     setFormData((prev) => ({

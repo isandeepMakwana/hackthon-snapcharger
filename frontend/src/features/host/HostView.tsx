@@ -1,25 +1,61 @@
-import { Suspense, lazy, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Activity, Calendar, IndianRupee, Plus } from 'lucide-react';
 import HostStatsCard from '@/features/host/components/HostStatsCard';
 import HostStationCard from '@/features/host/components/HostStationCard';
 import type { Station } from '@/types';
+import { StationStatus } from '@/types';
 import { useStationStore } from '@/store/useStationStore';
+import { createHostStation, fetchHostStats, fetchHostStations, updateHostStation } from '@/services/hostService';
 
 const AddStationModal = lazy(() => import('@/features/host/AddStationModal'));
 
 const HostView = () => {
   const stations = useStationStore((state) => state.stations);
   const stats = useStationStore((state) => state.hostStats);
+  const setHostStats = useStationStore((state) => state.setHostStats);
+  const loadStations = useStationStore((state) => state.loadStations);
   const saveStation = useStationStore((state) => state.saveStation);
   const toggleStationStatus = useStationStore((state) => state.toggleStationStatus);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStation, setEditingStation] = useState<Station | undefined>();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const myStations = useMemo(
-    () => stations.filter((station) => Number.parseInt(station.id, 10) % 2 !== 0),
-    [stations]
-  );
+  const myStations = useMemo(() => stations, [stations]);
+
+  const refreshStats = async () => {
+    try {
+      const statsData = await fetchHostStats();
+      setHostStats(statsData);
+    } catch {
+      setErrorMessage('Unable to refresh host stats. Please try again.');
+    }
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadHostData = async () => {
+      try {
+        const [stationData, statsData] = await Promise.all([
+          fetchHostStations(),
+          fetchHostStats()
+        ]);
+        if (!isMounted) return;
+        loadStations(stationData);
+        setHostStats(statsData);
+        setErrorMessage(null);
+      } catch {
+        setErrorMessage('Unable to load host data. Please ensure you are signed in and try again.');
+      }
+    };
+
+    loadHostData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [loadStations, setHostStats]);
 
   const handleEditClick = (station: Station) => {
     setEditingStation(station);
@@ -31,9 +67,63 @@ const HostView = () => {
     setIsModalOpen(true);
   };
 
+  const handleSaveStation = async (stationData: Partial<Station>) => {
+    const payload = {
+      hostName: stationData.hostName || 'Current User',
+      title: stationData.title || 'New Station',
+      location: stationData.location || 'Pune',
+      description: stationData.description || '',
+      connectorType: stationData.connectorType || 'Type 2',
+      powerOutput: stationData.powerOutput || '7.2kW',
+      pricePerHour: stationData.pricePerHour ?? 0,
+      image: stationData.image || '',
+      lat: stationData.lat ?? 18.5204,
+      lng: stationData.lng ?? 73.8567,
+      phoneNumber: stationData.phoneNumber,
+    };
+
+    try {
+      const saved = stationData.id
+        ? await updateHostStation(stationData.id, payload)
+        : await createHostStation(payload);
+      saveStation(saved);
+      void refreshStats();
+      setErrorMessage(null);
+    } catch {
+      saveStation(stationData);
+      setErrorMessage('Unable to save station. Please check your connection and try again.');
+    }
+  };
+
+  const handleToggleStatus = async (stationId: string) => {
+    const target = stations.find((station) => station.id === stationId);
+    if (!target) return;
+
+    const nextStatus =
+      target.status === StationStatus.OFFLINE ? StationStatus.AVAILABLE : StationStatus.OFFLINE;
+
+    try {
+      const updated = await updateHostStation(stationId, { status: nextStatus });
+      saveStation(updated);
+      void refreshStats();
+      setErrorMessage(null);
+    } catch {
+      toggleStationStatus(stationId);
+      setErrorMessage('Unable to update station status. Please check your login and try again.');
+    }
+  };
+
   return (
     <div className="flex h-[calc(100vh-64px)] flex-col overflow-y-auto bg-surface">
       <div className="px-4 pt-6 md:px-6">
+        {errorMessage && (
+          <div
+            role="alert"
+            className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700"
+          >
+            {errorMessage}
+          </div>
+        )}
         <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">Host Dashboard</p>
@@ -85,7 +175,7 @@ const HostView = () => {
             <HostStationCard
               key={station.id}
               station={station}
-              onToggleStatus={toggleStationStatus}
+              onToggleStatus={handleToggleStatus}
               onEdit={handleEditClick}
             />
           ))}
@@ -96,7 +186,7 @@ const HostView = () => {
         <AddStationModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
-          onAddStation={saveStation}
+          onAddStation={handleSaveStation}
           initialData={editingStation}
         />
       </Suspense>

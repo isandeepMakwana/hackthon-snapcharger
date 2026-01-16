@@ -8,7 +8,8 @@ interface NavbarProps {
   isAuthenticated: boolean;
   onLoginClick: () => void;
   onLogout: () => void;
-  authRole: 'driver' | 'host' | null;
+  authRole: 'driver' | 'host' | 'admin' | null;
+  locationLabel?: string;
 }
 
 const Navbar = ({
@@ -18,11 +19,12 @@ const Navbar = ({
   onLoginClick,
   onLogout,
   authRole,
+  locationLabel,
 }: NavbarProps) => {
   const [showMenu, setShowMenu] = useState(false);
 
   return (
-    <nav className="relative z-40 flex h-16 items-center justify-between border-b border-border bg-surface-strong/90 px-4 backdrop-blur sm:px-6">
+    <nav className="relative z-[1100] flex h-16 items-center justify-between border-b border-border bg-surface-strong/90 px-4 backdrop-blur sm:px-6">
       <div className="flex items-center gap-3">
         <div className="rounded-lg bg-emerald-500 p-1.5 text-white">
           <Zap size={20} fill="currentColor" aria-hidden="true" />
@@ -67,10 +69,12 @@ const Navbar = ({
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="hidden items-center gap-1 rounded-full border border-border bg-surface px-3 py-1 text-xs font-semibold text-muted sm:flex">
-          <MapPin size={12} aria-hidden="true" />
-          Pune - 6 km radius
-        </div>
+        {locationLabel && (
+          <div className="hidden items-center gap-1 rounded-full border border-border bg-surface px-3 py-1 text-xs font-semibold text-muted sm:flex">
+            <MapPin size={12} aria-hidden="true" />
+            {locationLabel}
+          </div>
+        )}
         <button
           type="button"
           className="rounded-full p-2 text-muted transition hover:bg-surface sm:hidden"
@@ -98,18 +102,18 @@ const Navbar = ({
               <>
                 <button
                   type="button"
-                  className="fixed inset-0 z-10"
+                  className="fixed inset-0 z-[1050]"
                   aria-label="Close menu"
                   onClick={() => setShowMenu(false)}
                 />
                 <div
-                  className="absolute right-0 top-full z-20 mt-2 w-48 overflow-hidden rounded-2xl border border-border bg-surface-strong shadow-card"
+                  className="absolute right-0 top-full z-[1100] mt-2 w-48 overflow-hidden rounded-2xl border border-border bg-surface-strong shadow-card"
                   role="menu"
                 >
                   <div className="border-b border-border px-4 py-3">
                     <p className="text-sm font-semibold text-ink">Signed in</p>
                     <p className="text-xs text-muted">
-                      Role: {authRole === 'host' ? 'Host' : 'Driver'}
+                      Role: {authRole === 'host' ? 'Host' : authRole === 'admin' ? 'Admin' : 'Driver'}
                     </p>
                   </div>
                   <button

@@ -1,8 +1,17 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import HostView from '@/features/host/HostView';
+import { MOCK_HOST_STATS, MOCK_STATIONS } from '@/data/mockStations';
 import { useStationStore } from '@/store/useStationStore';
 import { StationStatus } from '@/types';
+
+jest.mock('@/services/hostService', () => ({
+  __esModule: true,
+  fetchHostStations: jest.fn(async () => MOCK_STATIONS),
+  fetchHostStats: jest.fn(async () => MOCK_HOST_STATS),
+  createHostStation: jest.fn(async () => MOCK_STATIONS[0]),
+  updateHostStation: jest.fn(async () => ({ ...MOCK_STATIONS[0], status: StationStatus.OFFLINE })),
+}));
 
 beforeEach(() => {
   useStationStore.getState().reset();
@@ -26,9 +35,10 @@ test('toggles station availability', async () => {
   if (!toggle) throw new Error('Missing toggle control');
   await user.click(toggle);
 
-  const updatedStation = useStationStore
-    .getState()
-    .stations.find((station) => station.id === '1');
-
-  expect(updatedStation?.status).toBe(StationStatus.OFFLINE);
+  await waitFor(() => {
+    const updatedStation = useStationStore
+      .getState()
+      .stations.find((station) => station.id === '1');
+    expect(updatedStation?.status).toBe(StationStatus.OFFLINE);
+  });
 });

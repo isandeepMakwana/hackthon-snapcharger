@@ -1,0 +1,14 @@
+__pycache__
+*.pyc
+.env
+.venv
+.venv-py312
+pytest_cache
+.pytest_cache
+coverage
+htmlcov
+snapcharge.db
+test.db
+
+
+venv/

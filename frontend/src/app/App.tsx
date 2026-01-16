@@ -1,55 +1,102 @@
-import { Suspense, lazy, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import Navbar from '@/components/Navbar';
 import { useStationStore } from '@/store/useStationStore';
 import LoginPage from '@/features/auth/LoginPage';
 import RegisterPage from '@/features/auth/RegisterPage';
+import {
+  clearAuthSession,
+  fetchProfile,
+  isSessionExpired,
+  loadAuthSession,
+  loginUser,
+  logoutSession,
+  persistAuthSession,
+  refreshSession,
+  registerUser,
+  requestPasswordReset,
+  storeAuthSession,
+} from '@/services/authService';
+import type { AuthRole, AuthUser, StoredAuthSession } from '@/types/auth';
 
 const DriverView = lazy(() => import('@/features/driver/DriverView'));
 const HostView = lazy(() => import('@/features/host/HostView'));
 
 type AuthState = 'guest' | 'login' | 'register' | 'authenticated';
-type AuthRole = 'driver' | 'host' | null;
 type LoginIntent = 'general' | 'book' | 'host';
 
 const App = () => {
   const viewMode = useStationStore((state) => state.viewMode);
   const setViewMode = useStationStore((state) => state.setViewMode);
+  const driverConfig = useStationStore((state) => state.driverConfig);
   const [authState, setAuthState] = useState<AuthState>('guest');
-  const [authRole, setAuthRole] = useState<AuthRole>(null);
+  const [authRole, setAuthRole] = useState<AuthRole | null>(null);
+  const [authSession, setAuthSession] = useState<StoredAuthSession | null>(null);
   const [loginIntent, setLoginIntent] = useState<LoginIntent>('general');
   const [pendingBookingStationId, setPendingBookingStationId] = useState<string | null>(null);
 
-  const handleLogin = (role: 'driver' | 'host') => {
+  const resolveViewMode = (role: AuthRole) => (role === 'host' || role === 'admin' ? 'host' : 'driver');
+
+  const applyAuthenticatedState = (user: AuthUser) => {
     setAuthState('authenticated');
-    setAuthRole(role);
+    setAuthRole(user.role);
     if (pendingBookingStationId) {
       setViewMode('driver');
       return;
     }
-    setViewMode(role);
+    setViewMode(resolveViewMode(user.role));
   };
 
-  const handleRegister = (role: 'driver' | 'host') => {
-    setAuthState('authenticated');
-    setAuthRole(role);
-    if (pendingBookingStationId) {
-      setViewMode('driver');
-      return;
+  const handleLogin = async (payload: { role: 'driver' | 'host'; email: string; password: string }) => {
+    const result = await loginUser({ email: payload.email, password: payload.password });
+    if (result.user.role !== payload.role && !(result.user.role === 'admin' && payload.role === 'host')) {
+      throw new Error(`This account is registered as a ${result.user.role}.`);
     }
-    setViewMode(role);
+    const stored = storeAuthSession(result);
+    setAuthSession(stored);
+    applyAuthenticatedState(result.user);
+  };
+
+  const handleRegister = async (payload: {
+    role: 'driver' | 'host';
+    username: string;
+    email: string;
+    password: string;
+    vehicleModel?: string;
+    parkingType?: string;
+  }) => {
+    const result = await registerUser({
+      username: payload.username,
+      email: payload.email,
+      password: payload.password,
+      role: payload.role,
+    });
+    const stored = storeAuthSession(result);
+    setAuthSession(stored);
+    applyAuthenticatedState(result.user);
+  };
+
+  const handleForgotPassword = async (email: string) => {
+    await requestPasswordReset(email);
   };
 
   const handleLogout = () => {
+    const refreshToken = authSession?.refreshToken;
+    clearAuthSession();
+    setAuthSession(null);
     setAuthState('guest');
     setAuthRole(null);
     setLoginIntent('general');
     setPendingBookingStationId(null);
     setViewMode('driver');
+
+    if (refreshToken) {
+      void logoutSession(refreshToken).catch(() => {});
+    }
   };
 
   const handleViewModeChange = (mode: 'driver' | 'host') => {
     if (mode === 'host') {
-      if (authState !== 'authenticated' || authRole !== 'host') {
+      if (authState !== 'authenticated' || (authRole !== 'host' && authRole !== 'admin')) {
         setLoginIntent('host');
         setAuthState('login');
         return;
@@ -71,6 +118,47 @@ const App = () => {
     setLoginIntent('general');
   };
 
+  useEffect(() => {
+    let isActive = true;
+
+    const restoreSession = async () => {
+      const stored = loadAuthSession();
+      if (!stored) {
+        return;
+      }
+
+      try {
+        if (isSessionExpired(stored)) {
+          const refreshed = await refreshSession(stored.refreshToken);
+          const updated = storeAuthSession(refreshed);
+          if (!isActive) return;
+          setAuthSession(updated);
+          applyAuthenticatedState(refreshed.user);
+          return;
+        }
+
+        const profile = await fetchProfile(stored.accessToken);
+        const updatedSession = { ...stored, user: profile, role: profile.role };
+        persistAuthSession(updatedSession);
+        if (!isActive) return;
+        setAuthSession(updatedSession);
+        applyAuthenticatedState(profile);
+      } catch {
+        clearAuthSession();
+        if (!isActive) return;
+        setAuthSession(null);
+        setAuthState('guest');
+        setAuthRole(null);
+      }
+    };
+
+    restoreSession();
+
+    return () => {
+      isActive = false;
+    };
+  }, [setViewMode]);
+
   if (authState === 'login') {
     const loginMessage =
       loginIntent === 'book'
@@ -83,6 +171,7 @@ const App = () => {
     return (
       <LoginPage
         onLogin={handleLogin}
+        onForgotPassword={handleForgotPassword}
         onNavigateToRegister={() => setAuthState('register')}
         notice={loginMessage}
         defaultRole={loginDefaultRole}
@@ -122,6 +211,7 @@ const App = () => {
           onLoginClick={() => handleLoginRequest('general')}
           onLogout={handleLogout}
           authRole={authRole}
+          locationLabel={viewMode === 'driver' ? driverConfig?.locationLabel : undefined}
         />
         <main id="main-content" className="flex-1 overflow-hidden">
           <Suspense

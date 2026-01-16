@@ -7,6 +7,7 @@ import StationDetailPanel from '@/features/driver/components/StationDetailPanel'
 import type { Station } from '@/types';
 import { StationStatus } from '@/types';
 import { useStationStore } from '@/store/useStationStore';
+import { createDriverBooking, fetchDriverConfig, fetchDriverStations } from '@/services/driverService';
 
 interface DriverViewProps {
   isLoggedIn: boolean;
@@ -15,21 +16,6 @@ interface DriverViewProps {
   onPendingBookingHandled: () => void;
 }
 
-const USER_LOCATION = { lat: 18.5204, lng: 73.8567 };
-
-const generateTimeSlots = () => {
-  const slots: string[] = [];
-  const now = new Date();
-  now.setHours(now.getHours() + 1, 0, 0, 0);
-
-  for (let i = 0; i < 6; i += 1) {
-    slots.push(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-    now.setHours(now.getHours() + 1);
-  }
-
-  return slots;
-};
-
 const DriverView = ({
   isLoggedIn,
   onLoginRequest,
@@ -37,18 +23,23 @@ const DriverView = ({
   onPendingBookingHandled,
 }: DriverViewProps) => {
   const stations = useStationStore((state) => state.stations);
+  const loadStations = useStationStore((state) => state.loadStations);
   const bookStation = useStationStore((state) => state.bookStation);
+  const saveStation = useStationStore((state) => state.saveStation);
+  const driverConfig = useStationStore((state) => state.driverConfig);
+  const setDriverConfig = useStationStore((state) => state.setDriverConfig);
 
   const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
   const [showBookingConfirm, setShowBookingConfirm] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'reviews' | 'about'>('overview');
   const [selectedTimeSlot, setSelectedTimeSlot] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('');
   const [activeTags, setActiveTags] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const availableSlots = useMemo(() => generateTimeSlots(), []);
+  const availableSlots = useMemo(() => driverConfig?.booking.timeSlots ?? [], [driverConfig]);
   const handleClearSelection = useCallback(() => setSelectedStationId(null), []);
   const handleSelectStation = useCallback((station: Station) => setSelectedStationId(station.id), []);
 
@@ -56,6 +47,32 @@ const DriverView = ({
     () => stations.find((station) => station.id === selectedStationId) || null,
     [stations, selectedStationId]
   );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadConfig = async () => {
+      try {
+        const config = await fetchDriverConfig();
+        if (!isMounted) return;
+        setDriverConfig(config);
+        setStatusFilter((prev) => prev || config.statusOptions[0]?.value || 'ALL');
+        if (config.booking.timeSlots.length > 0) {
+          setSelectedTimeSlot(config.booking.timeSlots[0]);
+        }
+        setErrorMessage(null);
+      } catch {
+        if (!isMounted) return;
+        setErrorMessage('Unable to load driver settings. Please try again.');
+      }
+    };
+
+    loadConfig();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [setDriverConfig]);
 
   useEffect(() => {
     if (selectedStation) {
@@ -87,38 +104,35 @@ const DriverView = ({
     setActiveTags((prev) => (prev.includes(tag) ? prev.filter((item) => item !== tag) : [...prev, tag]));
   };
 
-  const filteredStations = useMemo(() => {
-    return stations.filter((station) => {
-      if (statusFilter !== 'All') {
-        if (statusFilter === 'Available' && station.status !== StationStatus.AVAILABLE) return false;
-        if (statusFilter === 'Busy' && station.status !== StationStatus.BUSY) return false;
-        if (statusFilter === 'Offline' && station.status !== StationStatus.OFFLINE) return false;
+  useEffect(() => {
+    if (!driverConfig) return;
+    const fetchStations = async () => {
+      try {
+        const data = await fetchDriverStations({
+          lat: driverConfig.location.lat,
+          lng: driverConfig.location.lng,
+          radiusKm: driverConfig.searchRadiusKm,
+          status: statusFilter,
+          tags: activeTags,
+          query: searchQuery.trim() ? searchQuery.trim() : undefined
+        });
+        loadStations(data);
+        setErrorMessage(null);
+      } catch {
+        setErrorMessage('Unable to load stations. Please try again.');
       }
+    };
 
-      if (activeTags.includes('Fast Charge')) {
-        if (!station.powerOutput.includes('22kW') && !station.powerOutput.includes('11kW')) return false;
-      }
-      if (activeTags.includes('Type 2') && station.connectorType !== 'Type 2') return false;
-      if (activeTags.includes('< ₹200/hr') && station.pricePerHour >= 200) return false;
-
-      if (searchQuery.trim()) {
-        const query = searchQuery.trim().toLowerCase();
-        const matches =
-          station.title.toLowerCase().includes(query) ||
-          station.location.toLowerCase().includes(query) ||
-          station.hostName.toLowerCase().includes(query);
-        if (!matches) return false;
-      }
-
-    return true;
-    });
-  }, [stations, statusFilter, activeTags, searchQuery]);
+    const delay = searchQuery.trim() ? 300 : 0;
+    const timeout = window.setTimeout(fetchStations, delay);
+    return () => window.clearTimeout(timeout);
+  }, [driverConfig, statusFilter, activeTags, searchQuery, loadStations]);
 
   useEffect(() => {
     if (!selectedStationId) return;
-    const stillVisible = filteredStations.some((station) => station.id === selectedStationId);
+    const stillVisible = stations.some((station) => station.id === selectedStationId);
     if (!stillVisible) setSelectedStationId(null);
-  }, [filteredStations, selectedStationId]);
+  }, [stations, selectedStationId]);
 
   const initiateBooking = () => {
     if (!selectedStation || selectedStation.status !== StationStatus.AVAILABLE) return;
@@ -130,11 +144,26 @@ const DriverView = ({
   };
 
   const confirmBooking = () => {
-    if (!selectedStation) return;
-    bookStation(selectedStation.id);
-    setShowBookingConfirm(false);
-    setShowSuccessToast(true);
-    window.setTimeout(() => setShowSuccessToast(false), 3000);
+    if (!selectedStation || !driverConfig) return;
+    createDriverBooking({
+      stationId: selectedStation.id,
+      startTime: selectedTimeSlot,
+      userLat: driverConfig.location.lat,
+      userLng: driverConfig.location.lng
+    })
+      .then((updated) => {
+        saveStation(updated);
+        setErrorMessage(null);
+        setShowBookingConfirm(false);
+        setShowSuccessToast(true);
+        window.setTimeout(() => setShowSuccessToast(false), 3000);
+      })
+      .catch(() => {
+        bookStation(selectedStation.id);
+        setErrorMessage('Unable to complete booking. Please try again.');
+        window.setTimeout(() => setErrorMessage(null), 3000);
+        setShowBookingConfirm(false);
+      });
   };
 
   useEffect(() => {
@@ -154,9 +183,12 @@ const DriverView = ({
   };
 
   const handleCall = () => {
-    if (!selectedStation) return;
-    const number = selectedStation.phoneNumber || '+919999999999';
-    window.location.href = `tel:${number}`;
+    if (!selectedStation?.phoneNumber) {
+      setErrorMessage('No contact number available for this station.');
+      window.setTimeout(() => setErrorMessage(null), 3000);
+      return;
+    }
+    window.location.href = `tel:${selectedStation.phoneNumber}`;
   };
 
   const handleShare = async () => {
@@ -194,6 +226,17 @@ const DriverView = ({
               <p className="text-sm font-semibold">Booking Confirmed!</p>
               <p className="text-xs opacity-90">Slot reserved for {selectedTimeSlot}</p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {errorMessage && (
+        <div
+          role="alert"
+          className="absolute left-1/2 top-4 z-[1000] w-11/12 max-w-sm -translate-x-1/2 animate-in slide-in-from-top-5"
+        >
+          <div className="flex items-center gap-3 rounded-2xl bg-rose-500 px-4 py-3 text-white shadow-glow">
+            <span className="text-sm font-semibold">{errorMessage}</span>
           </div>
         </div>
       )}
@@ -261,23 +304,28 @@ const DriverView = ({
             toggleTag={toggleTag}
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
+            filterTags={driverConfig?.filterTags ?? []}
+            statusOptions={driverConfig?.statusOptions ?? []}
+            searchPlaceholder={driverConfig?.searchPlaceholder ?? ''}
           />
           <div className="mt-3 flex items-center justify-between text-xs text-muted">
-            <span>{filteredStations.length} stations</span>
-            <span className="flex items-center gap-1">
-              <Filter size={12} /> Personalized for Pune
-            </span>
+            <span>{stations.length} stations</span>
+            {driverConfig?.personalizedLabel && (
+              <span className="flex items-center gap-1">
+                <Filter size={12} /> {driverConfig.personalizedLabel}
+              </span>
+            )}
           </div>
         </div>
 
         <div className="flex-1 space-y-4 overflow-y-auto bg-surface px-4 py-4">
-          {filteredStations.length === 0 ? (
+          {stations.length === 0 ? (
             <div className="flex h-48 flex-col items-center justify-center text-muted">
               <Filter size={28} className="mb-2 opacity-60" />
               <p className="text-sm">No stations found for these filters.</p>
             </div>
           ) : (
-            filteredStations.map((station, index) => (
+            stations.map((station, index) => (
               <div
                 key={station.id}
                 style={{ animationDelay: `${index * 40}ms` }}
@@ -295,14 +343,17 @@ const DriverView = ({
         </div>
       </div>
 
-      <div className="order-1 h-[45%] w-full bg-slate-200 md:order-2 md:h-full md:w-7/12 lg:w-8/12">
-        <MapCanvas
-          stations={filteredStations}
-          selectedStationId={selectedStationId ?? undefined}
-          onSelectStation={handleSelectStation}
-          onClearSelection={handleClearSelection}
-          userLocation={USER_LOCATION}
-        />
+      <div className="relative z-0 isolate order-1 h-[45%] w-full bg-slate-200 md:order-2 md:h-full md:w-7/12 lg:w-8/12">
+        {driverConfig && (
+          <MapCanvas
+            stations={stations}
+            selectedStationId={selectedStationId ?? undefined}
+            onSelectStation={handleSelectStation}
+            onClearSelection={handleClearSelection}
+            userLocation={driverConfig.location}
+            legendItems={driverConfig.legend}
+          />
+        )}
         {selectedStation && (
           <>
             <button
@@ -324,6 +375,7 @@ const DriverView = ({
               onCall={handleCall}
               onShare={handleShare}
               isLoggedIn={isLoggedIn}
+              serviceFee={driverConfig?.booking.serviceFee ?? 0}
             />
           </>
         )}

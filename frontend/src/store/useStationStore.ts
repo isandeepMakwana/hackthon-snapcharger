@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { HostStats, Station } from '@/types';
+import type { DriverConfig } from '@/types/driver';
 import { StationStatus } from '@/types';
-import { MOCK_HOST_STATS, MOCK_STATIONS } from '@/data/mockStations';
 
 type ViewMode = 'driver' | 'host';
 
@@ -9,14 +9,16 @@ type StationStore = {
   viewMode: ViewMode;
   stations: Station[];
   hostStats: HostStats;
+  driverConfig: DriverConfig | null;
   setViewMode: (mode: ViewMode) => void;
+  loadStations: (stations: Station[]) => void;
+  setHostStats: (stats: HostStats) => void;
+  setDriverConfig: (config: DriverConfig) => void;
   saveStation: (stationData: Partial<Station>) => void;
   bookStation: (id: string) => void;
   toggleStationStatus: (id: string) => void;
   reset: () => void;
 };
-
-const defaultStats: HostStats = MOCK_HOST_STATS;
 
 const createNewStation = (stationData: Partial<Station>): Station => ({
   id: String(Date.now()),
@@ -40,16 +42,28 @@ const createNewStation = (stationData: Partial<Station>): Station => ({
 
 const initialState = {
   viewMode: 'driver' as ViewMode,
-  stations: MOCK_STATIONS,
-  hostStats: defaultStats,
+  stations: [] as Station[],
+  hostStats: {
+    totalEarnings: 0,
+    activeBookings: 0,
+    stationHealth: 0
+  } as HostStats,
+  driverConfig: null,
 };
 
 export const useStationStore = create<StationStore>((set) => ({
   ...initialState,
   setViewMode: (mode) => set({ viewMode: mode }),
+  loadStations: (stations) => set({ stations }),
+  setHostStats: (stats) => set({ hostStats: stats }),
+  setDriverConfig: (config) => set({ driverConfig: config }),
   saveStation: (stationData) =>
     set((state) => {
       if (stationData.id) {
+        const existing = state.stations.some((station) => station.id === stationData.id);
+        if (!existing) {
+          return { stations: [stationData as Station, ...state.stations] };
+        }
         return {
           stations: state.stations.map((station) =>
             station.id === stationData.id
