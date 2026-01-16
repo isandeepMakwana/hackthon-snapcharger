@@ -46,6 +46,14 @@ const DriverBookingsView = ({
     };
   }, [isLoggedIn, driverProfileComplete]);
 
+  const handleBookingUpdated = (updatedBooking: DriverBooking) => {
+    setBookings((prev) =>
+      prev.map((booking) =>
+        booking.id === updatedBooking.id ? updatedBooking : booking
+      )
+    );
+  };
+
   const renderContent = () => {
     if (!isLoggedIn) {
       return (
@@ -102,7 +110,11 @@ const DriverBookingsView = ({
     return (
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {bookings.map((booking) => (
-          <DriverBookingCard key={booking.id} booking={booking} />
+          <DriverBookingCard 
+            key={booking.id} 
+            booking={booking}
+            onBookingUpdated={handleBookingUpdated}
+          />
         ))}
       </div>
     );

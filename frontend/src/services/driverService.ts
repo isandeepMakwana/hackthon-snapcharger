@@ -115,3 +115,28 @@ export const fetchDriverBookings = async (): Promise<DriverBooking[]> => {
     }
   });
 };
+
+export const completeDriverBooking = async (payload: {
+  bookingId: string;
+  rating: number;
+  review?: string;
+}): Promise<DriverBooking> => {
+  return requestJson<DriverBooking>('/api/driver/bookings/complete', {
+    method: 'POST',
+    headers: {
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify(payload)
+  });
+};
+
+export interface StationReview {
+  driverName: string;
+  rating: number;
+  review?: string | null;
+  createdAt: string;
+}
+
+export const fetchStationReviews = async (stationId: string): Promise<StationReview[]> => {
+  return requestJson<StationReview[]>(`/api/driver/stations/${stationId}/reviews`);
+};

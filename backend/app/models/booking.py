@@ -38,4 +38,12 @@ class DriverBookingOut(CamelModel):
     host_phone_number: Optional[str] = None
     start_time: Optional[str] = None
     status: BookingStatus
+    rating: Optional[int] = None
+    review: Optional[str] = None
     created_at: datetime
+
+
+class CompleteBookingRequest(CamelModel):
+    booking_id: str
+    rating: int
+    review: Optional[str] = None
