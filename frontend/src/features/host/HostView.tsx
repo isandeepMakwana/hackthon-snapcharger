@@ -20,6 +20,7 @@ const HostView = () => {
   const loadStations = useStationStore((state) => state.loadStations);
   const saveStation = useStationStore((state) => state.saveStation);
   const toggleStationStatus = useStationStore((state) => state.toggleStationStatus);
+  const viewMode = useStationStore((state) => state.viewMode);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStation, setEditingStation] = useState<Station | undefined>();
@@ -43,6 +44,7 @@ const HostView = () => {
   };
 
   useEffect(() => {
+    if (viewMode !== 'host') return;
     let isMounted = true;
 
     const loadHostData = async () => {
@@ -70,7 +72,7 @@ const HostView = () => {
     return () => {
       isMounted = false;
     };
-  }, [loadStations, setHostStats]);
+  }, [viewMode, loadStations, setHostStats]);
 
   const handleEditClick = (station: Station) => {
     setEditingStation(station);

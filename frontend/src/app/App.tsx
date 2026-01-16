@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import EditProfileModal from '@/components/EditProfileModal';
@@ -48,6 +48,7 @@ const AppShell = () => {
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [driverProfileData, setDriverProfileData] = useState<DriverProfile | null>(null);
   const [hostProfileData, setHostProfileData] = useState<HostProfile | null>(null);
+  const hasHandledStationRoute = useRef(false);
 
   const isAdmin = authSession?.user.role === 'admin';
   const driverProfileComplete = Boolean(authSession?.user.driverProfileComplete);
@@ -281,8 +282,16 @@ const AppShell = () => {
   // Only auto-switch to driver view if user navigates directly to a station URL
   // Don't interfere with manual tab switches
   useEffect(() => {
-    if ((stationSlug || stationId || stationRef) && viewMode !== 'driver') {
-      setViewMode('driver');
+    const hasStationRoute = Boolean(stationSlug || stationId || stationRef);
+    if (!hasStationRoute) {
+      hasHandledStationRoute.current = false;
+      return;
+    }
+    if (!hasHandledStationRoute.current) {
+      hasHandledStationRoute.current = true;
+      if (viewMode !== 'driver') {
+        setViewMode('driver');
+      }
     }
   }, [stationSlug, stationId, stationRef, viewMode, setViewMode]);
 

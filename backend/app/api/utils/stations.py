@@ -30,6 +30,7 @@ def build_station_out(
     distance = f'{distance_value:.1f} km' if distance_value is not None else '0.0 km'
     payload = {
         'id': station.id,
+        'host_id': station.host_id,
         'host_name': station.host_name,
         'title': station.title,
         'location': station.location,

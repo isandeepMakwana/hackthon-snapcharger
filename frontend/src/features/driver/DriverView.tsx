@@ -11,6 +11,7 @@ import type { Station } from '@/types';
 import { StationStatus } from '@/types';
 import { useStationStore } from '@/store/useStationStore';
 import { createDriverBooking, fetchDriverConfig, fetchDriverStations } from '@/services/driverService';
+import { loadAuthSession } from '@/services/authService';
 
 interface DriverViewProps {
   isLoggedIn: boolean;
@@ -67,17 +68,28 @@ const DriverView = ({
     return `${title}|${location}|${station.lat.toFixed(5)}|${station.lng.toFixed(5)}`;
   }, []);
 
+  const currentUserId = useMemo(() => loadAuthSession()?.user.id ?? null, []);
+
   const uniqueStations = useMemo(() => {
     const seen = new Set<string>();
     const result: Station[] = [];
     stations.forEach((station) => {
       const key = getStationKey(station);
-      if (seen.has(key)) return;
-      seen.add(key);
-      result.push(station);
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(station);
+        return;
+      }
+      if (!currentUserId || !station.hostId) return;
+      const existingIndex = result.findIndex((item) => getStationKey(item) === key);
+      if (existingIndex === -1) return;
+      const existing = result[existingIndex];
+      if (existing.hostId !== currentUserId && station.hostId === currentUserId) {
+        result[existingIndex] = station;
+      }
     });
     return result;
-  }, [stations, getStationKey]);
+  }, [stations, getStationKey, currentUserId]);
 
   const selectedStation = useMemo(
     () => uniqueStations.find((station) => station.id === selectedStationId) || null,

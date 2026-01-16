@@ -22,6 +22,7 @@ type StationStore = {
 
 const createNewStation = (stationData: Partial<Station>): Station => ({
   id: String(Date.now()),
+  hostId: stationData.hostId,
   hostName: 'Current User',
   title: stationData.title || 'New Station',
   location: stationData.location || 'Pune',
