@@ -16,6 +16,7 @@ const ProfileGateModal = ({ isOpen, mode, onClose, onSave }: ProfileGateModalPro
   const [parkingType, setParkingType] = useState<HostProfileInput['parkingType']>('covered');
   const [parkingAddress, setParkingAddress] = useState('');
   const [parkingCoords, setParkingCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [addressLookup, setAddressLookup] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -28,6 +29,7 @@ const ProfileGateModal = ({ isOpen, mode, onClose, onSave }: ProfileGateModalPro
     setParkingType('covered');
     setParkingAddress('');
     setParkingCoords(null);
+    setAddressLookup(null);
   }, [isOpen, mode]);
 
   if (!isOpen) return null;
@@ -57,6 +59,34 @@ const ProfileGateModal = ({ isOpen, mode, onClose, onSave }: ProfileGateModalPro
 
     setIsSubmitting(false);
     onClose();
+  };
+
+  const reverseGeocode = async (lat: number, lng: number) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+        {
+          headers: { Accept: 'application/json' },
+        }
+      );
+      if (!response.ok) return null;
+      const data = await response.json();
+      return typeof data?.display_name === 'string' ? data.display_name : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const handleLocationSelect = async (coords: { lat: number; lng: number }) => {
+    setParkingCoords(coords);
+    setAddressLookup('Finding address...');
+    const address = await reverseGeocode(coords.lat, coords.lng);
+    if (address) {
+      setParkingAddress(address);
+      setAddressLookup(address);
+    } else {
+      setAddressLookup('Location selected. Unable to resolve address.');
+    }
   };
 
   return (
@@ -168,19 +198,19 @@ const ProfileGateModal = ({ isOpen, mode, onClose, onSave }: ProfileGateModalPro
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold uppercase text-muted">Pin parking location</p>
-                  <button
-                    type="button"
-                    onClick={() => {
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase text-muted">Pin parking location</p>
+                    <button
+                      type="button"
+                      onClick={() => {
                       if (!navigator.geolocation) {
                         setErrorMessage('Geolocation is not supported in this browser.');
                         return;
                       }
                       navigator.geolocation.getCurrentPosition(
                         (position) => {
-                          setParkingCoords({
+                          handleLocationSelect({
                             lat: position.coords.latitude,
                             lng: position.coords.longitude
                           });
@@ -193,11 +223,9 @@ const ProfileGateModal = ({ isOpen, mode, onClose, onSave }: ProfileGateModalPro
                     <Navigation size={12} /> Use current location
                   </button>
                 </div>
-                <MapPicker value={parkingCoords} onChange={setParkingCoords} />
+                <MapPicker value={parkingCoords} onChange={handleLocationSelect} />
                 <p className="text-xs text-muted">
-                  {parkingCoords
-                    ? `Selected: ${parkingCoords.lat.toFixed(5)}, ${parkingCoords.lng.toFixed(5)}`
-                    : 'Click the map to select exact coordinates.'}
+                  {addressLookup ?? 'Click the map to select the exact location.'}
                 </p>
               </div>
             </>
