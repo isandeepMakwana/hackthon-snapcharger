@@ -16,6 +16,7 @@ interface DriverViewProps {
   pendingBookingStationId?: string | null;
   onPendingBookingHandled: () => void;
   driverProfileComplete: boolean;
+  stationId?: string;
   stationSlug?: string;
   onRequireDriverProfile: () => void;
 }
@@ -26,6 +27,7 @@ const DriverView = ({
   pendingBookingStationId,
   onPendingBookingHandled,
   driverProfileComplete,
+  stationId,
   stationSlug,
   onRequireDriverProfile,
 }: DriverViewProps) => {
@@ -82,6 +84,11 @@ const DriverView = ({
     [normalizeStationSlug]
   );
 
+  const getStationPath = useCallback(
+    (station: Station) => `/stations/${station.id}/${getStationSlug(station)}`,
+    [getStationSlug]
+  );
+
   const selectStation = useCallback((station: Station) => {
     setSelectedStationId(station.id);
   }, []);
@@ -94,9 +101,9 @@ const DriverView = ({
   const handleSelectStation = useCallback(
     (station: Station) => {
       selectStation(station);
-      navigate(`/stations/${getStationSlug(station)}`);
+      navigate(getStationPath(station));
     },
-    [navigate, getStationSlug, selectStation]
+    [navigate, getStationPath, selectStation]
   );
 
   useEffect(() => {
@@ -147,26 +154,34 @@ const DriverView = ({
   }, [selectedStationId]);
 
   useEffect(() => {
-    if (!stationSlug || stations.length === 0) return;
-    let decodedSlug = stationSlug;
-    try {
-      decodedSlug = decodeURIComponent(stationSlug);
-    } catch {
-      setSelectedStationId(null);
-      navigate('/', { replace: true });
-      return;
+    if ((!stationId && !stationSlug) || stations.length === 0) return;
+    const matchById = stationId
+      ? stations.find((station) => station.id === stationId)
+      : undefined;
+    let match = matchById;
+
+    if (!match && stationSlug) {
+      let decodedSlug = stationSlug;
+      try {
+        decodedSlug = decodeURIComponent(stationSlug);
+      } catch {
+        setSelectedStationId(null);
+        navigate('/', { replace: true });
+        return;
+      }
+      const normalizedSlug = normalizeStationSlug(decodedSlug);
+      match = stations.find(
+        (station) => normalizeStationSlug(station.title) === normalizedSlug
+      );
     }
-    const normalizedSlug = normalizeStationSlug(decodedSlug);
-    const match = stations.find(
-      (station) => normalizeStationSlug(station.title) === normalizedSlug
-    );
+
     if (match) {
       setSelectedStationId(match.id);
     } else {
       setSelectedStationId(null);
       navigate('/', { replace: true });
     }
-  }, [stationSlug, stations, normalizeStationSlug, navigate]);
+  }, [stationId, stationSlug, stations, normalizeStationSlug, navigate]);
 
   useEffect(() => {
     if (!showBookingConfirm) return;

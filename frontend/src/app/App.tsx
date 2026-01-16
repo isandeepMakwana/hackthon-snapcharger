@@ -30,7 +30,9 @@ type AuthState = 'guest' | 'login' | 'register' | 'authenticated';
 type LoginIntent = 'general' | 'book' | 'host';
 
 const AppShell = () => {
-  const { stationSlug } = useParams();
+  const { stationId, stationSlug, stationRef } = useParams();
+  const resolvedStationId = stationId ?? stationRef;
+  const resolvedStationSlug = stationSlug ?? stationRef;
   const navigate = useNavigate();
   const viewMode = useStationStore((state) => state.viewMode);
   const setViewMode = useStationStore((state) => state.setViewMode);
@@ -204,16 +206,16 @@ const AppShell = () => {
   }, [setViewMode]);
 
   useEffect(() => {
-    if (stationSlug && viewMode !== 'driver') {
+    if ((stationSlug || stationId || stationRef) && viewMode !== 'driver') {
       setViewMode('driver');
     }
-  }, [stationSlug, viewMode, setViewMode]);
+  }, [stationSlug, stationId, stationRef, viewMode, setViewMode]);
 
   useEffect(() => {
-    if (viewMode === 'host' && stationSlug) {
+    if (viewMode === 'host' && (stationSlug || stationId || stationRef)) {
       navigate('/', { replace: true });
     }
-  }, [viewMode, stationSlug, navigate]);
+  }, [viewMode, stationSlug, stationId, stationRef, navigate]);
 
   if (authState === 'login') {
     const loginMessage =
@@ -321,7 +323,8 @@ const AppShell = () => {
                 pendingBookingStationId={pendingBookingStationId}
                 onPendingBookingHandled={handlePendingBookingHandled}
                 driverProfileComplete={driverProfileComplete}
-                stationSlug={stationSlug}
+                stationId={resolvedStationId}
+                stationSlug={resolvedStationSlug}
                 onRequireDriverProfile={() => {
                   if (authState !== 'authenticated') return;
                   if (!driverProfileComplete && !isAdmin) {
@@ -344,7 +347,8 @@ const AppShell = () => {
 const App = () => (
   <Routes>
     <Route path="/" element={<AppShell />} />
-    <Route path="/stations/:stationSlug" element={<AppShell />} />
+    <Route path="/stations/:stationRef" element={<AppShell />} />
+    <Route path="/stations/:stationId/:stationSlug" element={<AppShell />} />
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>
 );
