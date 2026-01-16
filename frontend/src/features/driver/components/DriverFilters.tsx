@@ -1,4 +1,4 @@
-import { Filter } from 'lucide-react';
+import { Filter, Search } from 'lucide-react';
 
 interface DriverFiltersProps {
   statusFilter: string;
@@ -35,15 +35,18 @@ const DriverFilters = ({
         <label htmlFor="station-search" className="sr-only">
           Search for stations
         </label>
+        <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted">
+          <Search size={18} />
+        </div>
         <input
           id="station-search"
           type="text"
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
           placeholder={searchPlaceholder}
-          className="w-full rounded-2xl border border-border bg-surface px-4 py-3 pr-10 text-sm text-ink shadow-soft focus:border-accent"
+          className="w-full rounded-2xl border border-border/80 bg-surface-strong px-10 py-3 pr-12 text-sm text-ink shadow-soft focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
         />
-        <div className="absolute right-3 top-3 text-muted" aria-hidden="true">
+        <div className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-muted shadow-sm" aria-hidden="true">
           <Filter size={18} />
         </div>
       </div>
@@ -56,7 +59,7 @@ const DriverFilters = ({
           id="status-filter"
           value={statusFilter}
           onChange={(event) => setStatusFilter(event.target.value)}
-          className="rounded-full border border-border bg-surface px-3 py-2 text-xs font-semibold text-ink"
+          className="h-9 rounded-full border border-border/80 bg-surface-strong px-4 text-xs font-semibold text-ink shadow-sm focus:border-accent focus:outline-none"
         >
           {statusOptions.map((option) => (
             <option key={option.value} value={option.value}>
@@ -71,7 +74,7 @@ const DriverFilters = ({
           id="vehicle-filter"
           value={vehicleType}
           onChange={(event) => setVehicleType(event.target.value)}
-          className="rounded-full border border-border bg-surface px-3 py-2 text-xs font-semibold text-ink"
+          className="h-9 rounded-full border border-border/80 bg-surface-strong px-4 text-xs font-semibold text-ink shadow-sm focus:border-accent focus:outline-none"
         >
           {vehicleTypeOptions.map((option) => (
             <option key={option.value} value={option.value}>
@@ -84,10 +87,10 @@ const DriverFilters = ({
             type="button"
             key={tag.id}
             onClick={() => toggleTag(tag.id)}
-            className={`whitespace-nowrap rounded-full border px-3 py-2 text-xs font-semibold transition ${
+            className={`h-9 whitespace-nowrap rounded-full border px-4 text-xs font-semibold transition ${
               activeTags.includes(tag.id)
-                ? 'border-accent/40 bg-accent-soft text-ink'
-                : 'border-border bg-surface text-muted hover:text-ink'
+                ? 'border-accent/40 bg-accent-soft text-ink shadow-sm'
+                : 'border-border/80 bg-surface text-muted hover:border-accent/30 hover:text-ink'
             }`}
           >
             {tag.label}
