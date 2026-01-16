@@ -121,7 +121,7 @@ def test_host_station_crud_and_stats(client):
 
 def test_host_requires_profile(client):
     response = register_host(client)
-    headers = {'Authorization': f\"Bearer {response.json()['tokens']['accessToken']}\"}
+    headers = {'Authorization': f"Bearer {response.json()['tokens']['accessToken']}"}
 
     stats_response = client.get('/api/host/stats', headers=headers)
     assert stats_response.status_code == 403
