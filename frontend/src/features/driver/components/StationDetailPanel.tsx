@@ -29,6 +29,7 @@ interface StationDetailPanelProps {
   onCall: () => void;
   onShare: () => void;
   isLoggedIn: boolean;
+  serviceFee: number;
 }
 
 const StationDetailPanel = ({
@@ -44,6 +45,7 @@ const StationDetailPanel = ({
   onCall,
   onShare,
   isLoggedIn,
+  serviceFee,
 }: StationDetailPanelProps) => {
   return (
     <div className="absolute bottom-0 right-0 z-[500] flex h-[85vh] w-full animate-in slide-in-from-bottom-10 flex-col justify-end bg-surface-strong shadow-2xl md:top-0 md:h-full md:w-[380px] md:animate-in md:slide-in-from-right-10">
@@ -312,10 +314,10 @@ const StationDetailPanel = ({
             <span>Hourly Rate</span>
             <span className="font-semibold text-ink">₹{station.pricePerHour}</span>
           </div>
-          <div className="mt-2 flex items-center justify-between text-sm text-muted">
-            <span>Service Fee</span>
-            <span className="font-semibold text-ink">₹10</span>
-          </div>
+              <div className="mt-2 flex items-center justify-between text-sm text-muted">
+                <span>Service Fee</span>
+                <span className="font-semibold text-ink">₹{serviceFee}</span>
+              </div>
           <div className="mt-3 flex items-center gap-2 rounded-xl bg-surface-strong px-3 py-2 text-xs text-muted">
             <CalendarClock size={14} className="text-accent" />
             Reserve for today at <span className="font-semibold text-ink">{selectedTimeSlot}</span>

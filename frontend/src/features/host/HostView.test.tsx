@@ -1,8 +1,17 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import HostView from '@/features/host/HostView';
+import { MOCK_HOST_STATS, MOCK_STATIONS } from '@/data/mockStations';
 import { useStationStore } from '@/store/useStationStore';
 import { StationStatus } from '@/types';
+
+jest.mock('@/services/hostService', () => ({
+  __esModule: true,
+  fetchHostStations: jest.fn(async () => MOCK_STATIONS),
+  fetchHostStats: jest.fn(async () => MOCK_HOST_STATS),
+  createHostStation: jest.fn(async () => MOCK_STATIONS[0]),
+  updateHostStation: jest.fn(async () => ({ ...MOCK_STATIONS[0], status: StationStatus.OFFLINE })),
+}));
 
 beforeEach(() => {
   useStationStore.getState().reset();

@@ -3,8 +3,12 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.db.models.station import Station
 from app.db.models.user import User
+from app.security import hash_password
 
 settings = get_settings()
+
+DEMO_HOST_EMAIL = 'demo.host@snapcharge.dev'
+DEMO_HOST_USERNAME = 'Demo Host'
 
 DEMO_STATIONS = [
     {
@@ -97,6 +101,41 @@ def ensure_demo_stations_for_host(db: Session, host: User) -> List[Station]:
     existing = db.query(Station).filter(Station.host_id == host.id).first()
     if existing:
         return []
+
+    stations = []
+    for payload in DEMO_STATIONS:
+        station = Station(
+            host_id=host.id,
+            host_name=host.username,
+            **payload
+        )
+        db.add(station)
+        stations.append(station)
+
+    db.commit()
+    return stations
+
+
+def ensure_global_demo_stations(db: Session) -> List[Station]:
+    if not settings.seed_demo_data:
+        return []
+
+    existing = db.query(Station).first()
+    if existing:
+        return []
+
+    host = db.query(User).filter(User.email == DEMO_HOST_EMAIL).first()
+    if not host:
+        host = User(
+            username=DEMO_HOST_USERNAME,
+            email=DEMO_HOST_EMAIL,
+            password_hash=hash_password('DemoPassword123!'),
+            role='host',
+            permissions=[],
+            email_verified=True
+        )
+        db.add(host)
+        db.flush()
 
     stations = []
     for payload in DEMO_STATIONS:

@@ -2,41 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from starlette import status
 from app.api.deps import get_db, require_role
+from app.api.utils.stations import build_station_out
 from app.db.models.station import Station
 from app.db.models.user import User
 from app.db.seed import ensure_demo_stations_for_host
 from app.models.station import HostStats, StationCreate, StationOut, StationStatus, StationUpdate
 
 router = APIRouter(prefix='/api/host', tags=['host'])
-
-
-def _coords_for_station(station: Station) -> dict:
-    x = abs(int(station.lat * 10) % 100)
-    y = abs(int(station.lng * 10) % 100)
-    return {'x': float(x), 'y': float(y)}
-
-
-def _station_to_out(station: Station, distance: str = '0.0 km') -> StationOut:
-    payload = {
-        'id': station.id,
-        'host_name': station.host_name,
-        'title': station.title,
-        'location': station.location,
-        'rating': station.rating,
-        'review_count': station.review_count,
-        'price_per_hour': station.price_per_hour,
-        'status': station.status,
-        'image': station.image,
-        'connector_type': station.connector_type,
-        'power_output': station.power_output,
-        'description': station.description,
-        'coords': _coords_for_station(station),
-        'lat': station.lat,
-        'lng': station.lng,
-        'distance': distance,
-        'phone_number': station.phone_number
-    }
-    return StationOut.model_validate(payload)
 
 
 @router.get('/stats', response_model=HostStats)
@@ -71,7 +43,7 @@ async def list_stations(
     stations = db.query(Station).filter(Station.host_id == current_user.id).order_by(
         Station.created_at.desc()
     ).all()
-    return [_station_to_out(station) for station in stations]
+    return [build_station_out(station) for station in stations]
 
 
 @router.post('/stations', response_model=StationOut, status_code=status.HTTP_201_CREATED)
@@ -106,7 +78,7 @@ async def create_station(
     db.commit()
     db.refresh(station)
 
-    return _station_to_out(station)
+    return build_station_out(station)
 
 
 @router.patch('/stations/{station_id}', response_model=StationOut)
@@ -142,7 +114,7 @@ async def update_station(
     db.commit()
     db.refresh(station)
 
-    return _station_to_out(station)
+    return build_station_out(station)
 
 
 @router.post('/analyze-photo')

@@ -9,6 +9,7 @@ interface NavbarProps {
   onLoginClick: () => void;
   onLogout: () => void;
   authRole: 'driver' | 'host' | 'admin' | null;
+  locationLabel?: string;
 }
 
 const Navbar = ({
@@ -18,6 +19,7 @@ const Navbar = ({
   onLoginClick,
   onLogout,
   authRole,
+  locationLabel,
 }: NavbarProps) => {
   const [showMenu, setShowMenu] = useState(false);
 
@@ -67,10 +69,12 @@ const Navbar = ({
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="hidden items-center gap-1 rounded-full border border-border bg-surface px-3 py-1 text-xs font-semibold text-muted sm:flex">
-          <MapPin size={12} aria-hidden="true" />
-          Pune - 6 km radius
-        </div>
+        {locationLabel && (
+          <div className="hidden items-center gap-1 rounded-full border border-border bg-surface px-3 py-1 text-xs font-semibold text-muted sm:flex">
+            <MapPin size={12} aria-hidden="true" />
+            {locationLabel}
+          </div>
+        )}
         <button
           type="button"
           className="rounded-full p-2 text-muted transition hover:bg-surface sm:hidden"

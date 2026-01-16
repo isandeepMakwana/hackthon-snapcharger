@@ -27,6 +27,7 @@ type LoginIntent = 'general' | 'book' | 'host';
 const App = () => {
   const viewMode = useStationStore((state) => state.viewMode);
   const setViewMode = useStationStore((state) => state.setViewMode);
+  const driverConfig = useStationStore((state) => state.driverConfig);
   const [authState, setAuthState] = useState<AuthState>('guest');
   const [authRole, setAuthRole] = useState<AuthRole | null>(null);
   const [authSession, setAuthSession] = useState<StoredAuthSession | null>(null);
@@ -207,6 +208,7 @@ const App = () => {
           onLoginClick={() => handleLoginRequest('general')}
           onLogout={handleLogout}
           authRole={authRole}
+          locationLabel={viewMode === 'driver' ? driverConfig?.locationLabel : undefined}
         />
         <main id="main-content" className="flex-1 overflow-hidden">
           <Suspense

@@ -7,9 +7,10 @@ interface DriverFiltersProps {
   toggleTag: (tag: string) => void;
   searchQuery: string;
   setSearchQuery: (value: string) => void;
+  filterTags: { id: string; label: string }[];
+  statusOptions: { value: string; label: string }[];
+  searchPlaceholder: string;
 }
-
-const FILTER_TAGS = ['Fast Charge', 'Type 2', '< ₹200/hr'];
 
 const DriverFilters = ({
   statusFilter,
@@ -18,6 +19,9 @@ const DriverFilters = ({
   toggleTag,
   searchQuery,
   setSearchQuery,
+  filterTags,
+  statusOptions,
+  searchPlaceholder,
 }: DriverFiltersProps) => {
   return (
     <div className="space-y-3">
@@ -30,7 +34,7 @@ const DriverFilters = ({
           type="text"
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder="Search by area or host"
+          placeholder={searchPlaceholder}
           className="w-full rounded-2xl border border-border bg-surface px-4 py-3 pr-10 text-sm text-ink shadow-soft focus:border-accent"
         />
         <div className="absolute right-3 top-3 text-muted" aria-hidden="true">
@@ -48,23 +52,24 @@ const DriverFilters = ({
           onChange={(event) => setStatusFilter(event.target.value)}
           className="rounded-full border border-border bg-surface px-3 py-2 text-xs font-semibold text-ink"
         >
-          <option value="All">All Status</option>
-          <option value="Available">Available</option>
-          <option value="Busy">Busy</option>
-          <option value="Offline">Offline</option>
+          {statusOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
         </select>
-        {FILTER_TAGS.map((tag) => (
+        {filterTags.map((tag) => (
           <button
             type="button"
-            key={tag}
-            onClick={() => toggleTag(tag)}
+            key={tag.id}
+            onClick={() => toggleTag(tag.id)}
             className={`whitespace-nowrap rounded-full border px-3 py-2 text-xs font-semibold transition ${
-              activeTags.includes(tag)
+              activeTags.includes(tag.id)
                 ? 'border-accent/40 bg-accent-soft text-ink'
                 : 'border-border bg-surface text-muted hover:text-ink'
             }`}
           >
-            {tag}
+            {tag.label}
           </button>
         ))}
       </div>
