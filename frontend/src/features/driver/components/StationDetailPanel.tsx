@@ -21,6 +21,8 @@ interface StationDetailPanelProps {
   availableSlots: string[];
   selectedTimeSlot: string;
   onTimeSlotChange: (slot: string) => void;
+  selectedDate: string;
+  onDateChange: (value: string) => void;
   activeTab: 'overview' | 'reviews' | 'about';
   onTabChange: (tab: 'overview' | 'reviews' | 'about') => void;
   onClose: () => void;
@@ -37,6 +39,8 @@ const StationDetailPanel = ({
   availableSlots,
   selectedTimeSlot,
   onTimeSlotChange,
+  selectedDate,
+  onDateChange,
   activeTab,
   onTabChange,
   onClose,
@@ -49,7 +53,11 @@ const StationDetailPanel = ({
 }: StationDetailPanelProps) => {
   const bookedSlots = station.bookedTimeSlots ?? [];
   const isSelectedSlotBooked = selectedTimeSlot ? bookedSlots.includes(selectedTimeSlot) : false;
-  const canBook = station.status === StationStatus.AVAILABLE && !isSelectedSlotBooked && selectedTimeSlot !== '';
+  const canBook =
+    station.status === StationStatus.AVAILABLE &&
+    !isSelectedSlotBooked &&
+    selectedTimeSlot !== '' &&
+    selectedDate !== '';
 
   return (
     <div className="absolute bottom-0 right-0 z-[500] flex h-[85vh] w-full animate-in slide-in-from-bottom-10 flex-col justify-end bg-surface-strong shadow-2xl md:top-0 md:h-full md:w-[380px] md:animate-in md:slide-in-from-right-10">
@@ -99,6 +107,18 @@ const StationDetailPanel = ({
               <p className="mb-2 flex items-center gap-1 text-xs font-semibold uppercase text-muted">
                 <Clock size={12} /> Select Start Time
               </p>
+              <div className="mb-3">
+                <label className="text-[10px] font-semibold uppercase text-muted" htmlFor="booking-date">
+                  Booking date
+                </label>
+                <input
+                  id="booking-date"
+                  type="date"
+                  value={selectedDate}
+                  onChange={(event) => onDateChange(event.target.value)}
+                  className="mt-1 w-full rounded-xl border border-border bg-surface-strong px-3 py-2 text-xs font-semibold text-ink"
+                />
+              </div>
               <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
                 {availableSlots.map((slot) => {
                   const isBooked = bookedSlots.includes(slot);
@@ -114,9 +134,9 @@ const StationDetailPanel = ({
                           : selectedTimeSlot === slot
                             ? 'border-accent bg-accent text-white'
                             : 'border-border bg-surface-strong text-muted hover:text-ink'
-                      }`}
-                    >
-                      {slot}{isBooked ? ' • Booked' : ''}
+                    }`}
+                  >
+                      {slot}{isBooked ? ' • Unavailable' : ''}
                     </button>
                   );
                 })}
@@ -141,7 +161,7 @@ const StationDetailPanel = ({
             ) : (
               <>
                 <AlertCircle size={18} /> {station.status === StationStatus.AVAILABLE
-                  ? 'Select a time slot'
+                  ? 'Select a date & time'
                   : `Station ${station.status === StationStatus.BUSY ? 'Occupied' : 'Unavailable'}`}
               </>
             )}

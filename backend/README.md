@@ -40,6 +40,8 @@ The API will be available at `http://localhost:8000`.
 - Tables are created on startup (no migrations).
 - If using Postgres, ensure libpq is available or install a compatible psycopg binary.
 - Demo stations are seeded when `SEED_DEMO_DATA=true` and the `stations` table is empty.
+- Bookings are date-based and require `bookingDate` (`YYYY-MM-DD`) plus a `startTime`.
+- Host stations can optionally define `blockedTimeSlots` to prevent bookings at specific times.
 
 ## Tests
 

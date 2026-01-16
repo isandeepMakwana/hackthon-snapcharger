@@ -1,13 +1,16 @@
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from starlette import status
 from app.api.deps import get_db, require_host_profile
+from app.api.utils.bookings import expire_bookings
 from app.api.utils.stations import build_station_out
 from app.db.models.booking import Booking
 from app.db.models.station import Station
 from app.db.models.user import User
 from app.db.seed import ensure_demo_stations_for_host
-from app.models.booking import HostBookingOut
+from app.models.booking import BookingStatusUpdate, HostBookingOut
 from app.models.station import HostStats, StationCreate, StationOut, StationStatus, StationUpdate
 
 router = APIRouter(prefix='/api/host', tags=['host'])
@@ -19,15 +22,18 @@ async def get_stats(
     db: Session = Depends(get_db)
 ) -> HostStats:
     ensure_demo_stations_for_host(db, current_user)
+    expire_bookings(db)
     stations = db.query(Station).filter(Station.host_id == current_user.id).all()
 
     if not stations:
         return HostStats(total_earnings=0, active_bookings=0, station_health=0)
 
     total_earnings = sum(station.monthly_earnings for station in stations)
+    now = datetime.utcnow()
     active_bookings = db.query(Booking).filter(
         Booking.host_id == current_user.id,
-        Booking.status == 'ACTIVE'
+        Booking.status == 'ACTIVE',
+        or_(Booking.end_at.is_(None), Booking.end_at >= now)
     ).count()
     online = sum(1 for station in stations if station.status != StationStatus.OFFLINE.value)
     station_health = round((online / len(stations)) * 100)
@@ -79,6 +85,8 @@ async def create_station(
         lng=payload.lng,
         phone_number=station_phone,
         supported_vehicle_types=payload.supported_vehicle_types,
+        available_time_slots=payload.available_time_slots,
+        blocked_time_slots=payload.blocked_time_slots,
         monthly_earnings=payload.monthly_earnings
     )
     db.add(station)
@@ -93,6 +101,7 @@ async def list_bookings(
     current_user: User = Depends(require_host_profile),
     db: Session = Depends(get_db)
 ) -> list[HostBookingOut]:
+    expire_bookings(db)
     rows = db.query(Booking, Station).join(
         Station, Booking.station_id == Station.id
     ).filter(
@@ -110,12 +119,66 @@ async def list_bookings(
             driver_id=booking.driver_id,
             driver_name=booking.driver_name,
             driver_phone_number=booking.driver_phone_number,
+            booking_date=booking.booking_date,
             start_time=booking.start_time,
             status=booking.status,
             created_at=booking.created_at
         ))
 
     return results
+
+
+@router.patch('/bookings/{booking_id}', response_model=HostBookingOut)
+async def update_booking_status(
+    booking_id: str,
+    payload: BookingStatusUpdate,
+    current_user: User = Depends(require_host_profile),
+    db: Session = Depends(get_db)
+) -> HostBookingOut:
+    if payload.status not in {'COMPLETED', 'CANCELLED'}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={'code': 'INVALID_STATUS', 'message': 'Hosts can only cancel or complete bookings.'}
+        )
+
+    row = db.query(Booking, Station).join(
+        Station, Booking.station_id == Station.id
+    ).filter(
+        Booking.id == booking_id,
+        Booking.host_id == current_user.id
+    ).first()
+
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={'code': 'NOT_FOUND', 'message': 'Booking not found.'}
+        )
+
+    booking, station = row
+    if booking.status != 'ACTIVE':
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={'code': 'INVALID_STATUS', 'message': 'Booking is not active.'}
+        )
+
+    booking.status = payload.status
+    db.commit()
+    db.refresh(booking)
+
+    return HostBookingOut(
+        id=booking.id,
+        station_id=booking.station_id,
+        station_title=station.title,
+        station_location=station.location,
+        station_price_per_hour=station.price_per_hour,
+        driver_id=booking.driver_id,
+        driver_name=booking.driver_name,
+        driver_phone_number=booking.driver_phone_number,
+        booking_date=booking.booking_date,
+        start_time=booking.start_time,
+        status=booking.status,
+        created_at=booking.created_at
+    )
 
 
 @router.patch('/stations/{station_id}', response_model=StationOut)

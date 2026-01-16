@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 from enum import Enum
 from typing import Optional
 from app.models.base import CamelModel
@@ -19,6 +19,19 @@ class HostBookingOut(CamelModel):
     driver_id: str
     driver_name: str
     driver_phone_number: str
+    booking_date: date | None = None
     start_time: Optional[str] = None
     status: BookingStatus
     created_at: datetime
+
+
+class BookingOut(CamelModel):
+    id: str
+    station_id: str
+    booking_date: date | None = None
+    start_time: Optional[str] = None
+    status: BookingStatus
+
+
+class BookingStatusUpdate(CamelModel):
+    status: BookingStatus

@@ -62,6 +62,7 @@ export const fetchDriverStations = async (payload: {
   vehicleType?: string;
   tags?: string[];
   query?: string;
+  bookingDate?: string;
 }): Promise<Station[]> => {
   const params = new URLSearchParams({
     lat: String(payload.lat),
@@ -77,6 +78,9 @@ export const fetchDriverStations = async (payload: {
   if (payload.query) {
     params.set('q', payload.query);
   }
+  if (payload.bookingDate) {
+    params.set('booking_date', payload.bookingDate);
+  }
   if (payload.tags) {
     payload.tags.forEach((tag) => params.append('tags', tag));
   }
@@ -89,6 +93,7 @@ export const fetchDriverConfig = async (): Promise<DriverConfig> => {
 
 export const createDriverBooking = async (payload: {
   stationId: string;
+  bookingDate: string;
   startTime?: string;
   userLat?: number;
   userLng?: number;

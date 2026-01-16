@@ -35,3 +35,4 @@ The app will be available at `http://localhost:5173` by default.
 
 - The Driver and Host pages call backend APIs via `VITE_API_BASE_URL`.
 - Auth sessions are stored in `localStorage` under `snapcharge.auth`.
+- Driver bookings require a booking date and time slot; unavailable slots are disabled in the UI.

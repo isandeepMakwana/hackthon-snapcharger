@@ -21,6 +21,8 @@ class DriverProfileOut(CamelModel):
 class HostProfileIn(CamelModel):
     parking_type: str = Field(min_length=3, max_length=30)
     parking_address: Optional[str] = Field(default=None, max_length=255)
+    parking_lat: Optional[float] = None
+    parking_lng: Optional[float] = None
 
 
 class HostProfileOut(CamelModel):
@@ -28,5 +30,7 @@ class HostProfileOut(CamelModel):
     user_id: str
     parking_type: str
     parking_address: Optional[str] = None
+    parking_lat: Optional[float] = None
+    parking_lng: Optional[float] = None
     created_at: datetime
     updated_at: datetime

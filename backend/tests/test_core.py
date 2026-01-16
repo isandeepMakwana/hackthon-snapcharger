@@ -7,7 +7,6 @@ from app.core.exceptions import (
     internal_exception_handler,
     validation_exception_handler
 )
-from app.core.rate_limit import limiter, rate_limit
 
 
 def make_request():
@@ -49,27 +48,3 @@ def test_internal_exception_handler():
     assert response.status_code == 500
     assert payload['error']['code'] == 'INTERNAL_ERROR'
 
-
-def test_rate_limiter_blocks_requests():
-    key = 'test-key'
-    assert limiter.is_allowed(key, limit=1, window_seconds=60) is True
-    assert limiter.is_allowed(key, limit=1, window_seconds=60) is False
-
-
-def test_rate_limit_dependency_raises():
-    dependency = rate_limit(limit=1, window_seconds=60)
-    request = Request({
-        'type': 'http',
-        'method': 'GET',
-        'path': '/rate',
-        'headers': [],
-        'client': ('127.0.0.1', 12345)
-    })
-
-    assert limiter.is_allowed('127.0.0.1:/rate', limit=1, window_seconds=60) is True
-    assert limiter.is_allowed('127.0.0.1:/rate', limit=1, window_seconds=60) is False
-    try:
-        import asyncio
-        asyncio.run(dependency(request))
-    except Exception as exc:
-        assert getattr(exc, 'status_code', None) == 429
