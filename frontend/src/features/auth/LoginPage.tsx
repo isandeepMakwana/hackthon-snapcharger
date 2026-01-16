@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { ArrowRight, Loader2, Lock, Mail, Zap } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ArrowRight, Car, Home, Loader2, Lock, Mail, Zap } from 'lucide-react';
 
 interface LoginPageProps {
   onLogin: (payload: { role: 'driver' | 'host'; email: string; password: string }) => Promise<void>;
@@ -9,13 +9,24 @@ interface LoginPageProps {
   defaultRole?: 'driver' | 'host';
 }
 
-const LoginPage = ({ onLogin, onForgotPassword, onNavigateToRegister, notice }: LoginPageProps) => {
-  const [role, setRole] = useState<'driver' | 'host'>('driver');
+const LoginPage = ({
+  onLogin,
+  onForgotPassword,
+  onNavigateToRegister,
+  notice,
+  defaultRole,
+}: LoginPageProps) => {
+  const [role, setRole] = useState<'driver' | 'host'>(defaultRole ?? 'driver');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!defaultRole) return;
+    setRole(defaultRole);
+  }, [defaultRole]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
