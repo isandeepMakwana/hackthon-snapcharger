@@ -24,8 +24,8 @@ from app.models.station import StationOut
 router = APIRouter(prefix='/api/driver', tags=['driver'])
 
 DEFAULT_LOCATION = {'name': 'Pune', 'lat': 18.5204, 'lng': 73.8567}
-SEARCH_RADIUS_KM = 10.0
-DISPLAY_RADIUS_KM = 6.0
+SEARCH_RADIUS_KM = 20.0
+DISPLAY_RADIUS_KM = 20.0
 SEARCH_PLACEHOLDER = 'Search by area or host'
 SERVICE_FEE = 10
 
@@ -114,15 +114,18 @@ async def search_stations(
 ) -> list[StationOut]:
     ensure_global_demo_stations(db)
     stations = db.query(Station).all()
+    print(f"🔍 Total stations in DB: {len(stations)}")
 
     if status and status != 'ALL':
         stations = [station for station in stations if station.status == status]
+        print(f"🔍 After status filter ({status}): {len(stations)}")
 
     if vehicle_type and vehicle_type != 'ALL':
         stations = [
             station for station in stations
             if station.supported_vehicle_types and vehicle_type in station.supported_vehicle_types
         ]
+        print(f"🔍 After vehicle type filter ({vehicle_type}): {len(stations)}")
 
     if q:
         query = q.strip().lower()
@@ -133,6 +136,7 @@ async def search_stations(
                 or query in station.location.lower()
                 or query in station.host_name.lower()
             ]
+            print(f"🔍 After search query ({q}): {len(stations)}")
 
     if tags:
         for tag in tags:
@@ -157,6 +161,7 @@ async def search_stations(
                     station for station in stations
                     if station.price_per_hour < max_price
                 ]
+        print(f"🔍 After tag filters: {len(stations)}")
 
     results: list[StationOut] = []
     candidates: list[tuple[Station, float]] = []
@@ -165,10 +170,12 @@ async def search_stations(
         if dist <= radius_km:
             candidates.append((station, dist))
 
+    print(f"🔍 Stations within {radius_km}km radius: {len(candidates)}")
     booked_slots = _fetch_booked_slots(db, [station.id for station, _ in candidates])
     for station, dist in candidates:
         results.append(build_station_out(station, dist, booked_slots.get(station.id, [])))
 
+    print(f"📤 Returning {len(results)} stations")
     return results
 
 

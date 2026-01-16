@@ -276,17 +276,14 @@ const AppShell = () => {
     };
   }, [setViewMode]);
 
+  // Only auto-switch to driver view if user navigates directly to a station URL
+  // Don't interfere with manual tab switches
   useEffect(() => {
-    if (stationSlug && viewMode !== 'driver') {
+    if (stationSlug && viewMode !== 'driver' && authState === 'guest') {
+      // Only auto-switch for guest users navigating to station URLs
       setViewMode('driver');
     }
-  }, [stationSlug, viewMode, setViewMode]);
-
-  useEffect(() => {
-    if (viewMode === 'host' && stationSlug) {
-      navigate('/', { replace: true });
-    }
-  }, [viewMode, stationSlug, navigate]);
+  }, [stationSlug, viewMode, setViewMode, authState]);
 
   if (authState === 'login') {
     const loginMessage =

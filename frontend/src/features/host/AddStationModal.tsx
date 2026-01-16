@@ -219,25 +219,48 @@ const AddStationModal = ({
       )
     );
 
+    console.log('Local previews created:', previews.length);
     setSelectedImages(previews);
 
     setStep('analyzing');
     let result: GeminiAnalysisResult | null = null;
-    const primaryFile = files[0];
 
     try {
-      const backendJson = await analyzeHostPhoto(primaryFile);
+      // Send all files to backend for processing
+      const backendJson = await analyzeHostPhoto(files);
+      console.log('=== BACKEND RESPONSE ===');
+      console.log('Full response:', JSON.stringify(backendJson, null, 2));
+      console.log('image_urls:', backendJson?.image_urls);
+      console.log('image_urls type:', typeof backendJson?.image_urls);
+      console.log('image_urls is array:', Array.isArray(backendJson?.image_urls));
+      
       if (backendJson && backendJson.ai_data) {
         result = mapBackendResultToGemini(backendJson.ai_data);
+        
+        // Store the S3 image URLs if available
+        if (backendJson.image_urls && Array.isArray(backendJson.image_urls) && backendJson.image_urls.length > 0) {
+          console.log('✅ Setting S3 URLs:', backendJson.image_urls);
+          setSelectedImages(backendJson.image_urls);
+          // Force a re-render to ensure images update
+          setTimeout(() => {
+            console.log('Current selectedImages state:', backendJson.image_urls);
+          }, 100);
+        } else {
+          console.warn('⚠️ No valid image_urls in backend response');
+          console.log('Keeping local previews');
+        }
       } else {
+        console.warn('⚠️ No ai_data in backend response');
         result = mapBackendResultToGemini(backendJson);
       }
     } catch (error) {
-      console.error('Backend AI analysis failed, falling back to direct Gemini:', error);
+      console.error('❌ Backend AI analysis failed:', error);
+      // Fallback to Gemini with first file only
+      result = await analyzeChargerImage(files[0]);
     }
 
     if (!result) {
-      result = await analyzeChargerImage(primaryFile);
+      result = await analyzeChargerImage(files[0]);
     }
 
     setAnalysisData(result);
@@ -258,6 +281,10 @@ const AddStationModal = ({
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!isFormValid) return;
+    
+    // Use the first S3 URL if available, otherwise use the first selected image
+    const imageUrl = selectedImages.length > 0 ? selectedImages[0] : '';
+    
     onAddStation({
       id: initialData?.id,
       title: formData.title,
@@ -266,7 +293,7 @@ const AddStationModal = ({
       connectorType: formData.connectorType,
       powerOutput: formData.powerOutput,
       pricePerHour: Number(formData.pricePerHour),
-      image: selectedImages[0] || '',
+      image: imageUrl,
       supportedVehicleTypes: formData.supportedVehicleTypes,
       blockedTimeSlots: formData.blockedTimeSlots,
       availableTimeSlots: formData.availableTimeSlots,
@@ -610,7 +637,7 @@ const AddStationModal = ({
                       className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2 py-0.5 text-[11px] font-semibold text-muted transition hover:text-ink"
                       aria-label="Show visual evidence"
                     >
-                      <Info size={12} /> i
+                      <Info size={12} />
                     </button>
                   )}
                 </div>
@@ -624,17 +651,35 @@ const AddStationModal = ({
 
               {selectedImages.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold uppercase text-muted">Images</p>
+                  <p className="text-xs font-semibold uppercase text-muted">Images ({selectedImages.length})</p>
                   <div className="mt-2 grid grid-cols-3 gap-2">
-                    {selectedImages.map((image, index) => (
-                      <div key={`${image}-${index}`} className="relative overflow-hidden rounded-xl border border-border">
-                        <img
-                          src={image}
-                          alt={`Station image ${index + 1}`}
-                          className="h-20 w-full object-cover"
-                        />
-                      </div>
-                    ))}
+                    {selectedImages.map((image, index) => {
+                      const isS3Url = image.includes('s3.') || image.includes('amazonaws.com');
+                      const isDataUrl = image.startsWith('data:');
+                      console.log(`Image ${index + 1}:`, { url: image.substring(0, 50) + '...', isS3Url, isDataUrl });
+                      
+                      return (
+                        <div key={`${image}-${index}`} className="relative overflow-hidden rounded-xl border border-border">
+                          <img
+                            src={image}
+                            alt={`Station image ${index + 1}`}
+                            className="h-20 w-full object-cover"
+                            crossOrigin="anonymous"
+                            onError={(e) => {
+                              console.error(`❌ Failed to load image ${index + 1}`);
+                              console.error('URL:', image);
+                              console.error('Error:', e);
+                            }}
+                            onLoad={() => {
+                              console.log(`✅ Successfully loaded image ${index + 1}`);
+                            }}
+                          />
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/50 px-1 py-0.5 text-[8px] text-white">
+                            {isS3Url ? 'S3' : isDataUrl ? 'Local' : 'Unknown'}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}

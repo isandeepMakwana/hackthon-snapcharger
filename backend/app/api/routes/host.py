@@ -13,7 +13,7 @@ from app.models.station import HostStats, StationCreate, StationOut, StationStat
 from typing import List
 import uuid
 from io import BytesIO
-from app.api.utils.ai_service import analyze_charger_image, optimize_image_for_gemini
+from app.api.utils.ai_service import analyze_multiple_images, optimize_image_for_gemini
 from app.api.utils.s3_service import upload_file_to_s3
 
 router = APIRouter(prefix='/api/host', tags=['host'])
@@ -170,46 +170,73 @@ async def update_station(
 @router.post('/analyze-photo')
 async def analyze_photo(
     current_user: User = Depends(require_host_profile),
-    file: UploadFile = File(...)
+    files: List[UploadFile] = File(...)
 ) -> dict:
     """
-    Process station image:
+    Process station images:
     1. Optimize (Resize/Compress) to save data.
     2. Upload to S3 for permanent storage.
     3. Analyze with Gemini for technical specs.
     """
     try:
-        # 1. Read Raw Bytes
-        raw_content = await file.read()
+        print(f"📸 Received {len(files)} files for processing")
         
-        # 2. Optimize: Convert to efficient JPEG (Saves 90% bandwidth)
-        # We do this BEFORE S3 upload to save storage costs
-        optimized_content = optimize_image_for_gemini(raw_content)
+        # 1. Prepare lists
+        optimized_images = []
+        s3_urls = []
         
-        # 3. Upload to S3
-        # Use User ID in filename to prevent collisions/overwrites
-        filename = f"{current_user.id}_{uuid.uuid4()}.jpg"
-        s3_url = upload_file_to_s3(BytesIO(optimized_content), filename)
-        
-        if not s3_url:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail={'code': 'UPLOAD_FAILED', 'message': 'S3 Upload Failed'}
-            )
+        # 2. Process Files Loop (Optimize & Upload)
+        for idx, file in enumerate(files):
+            print(f"Processing file {idx + 1}/{len(files)}: {file.filename}")
+            raw_content = await file.read()
+            
+            # Optimize
+            optimized_content = optimize_image_for_gemini(raw_content)
+            optimized_images.append(optimized_content)  # Save for AI
+            print(f"✅ Optimized file {idx + 1}")
+            
+            # Upload to S3
+            # Use User ID in filename to prevent collisions/overwrites
+            filename = f"{current_user.id}_{uuid.uuid4()}.jpg"
+            s3_url = upload_file_to_s3(BytesIO(optimized_content), filename)
+            
+            if not s3_url:
+                print(f"❌ S3 upload failed for file {idx + 1}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail={'code': 'UPLOAD_FAILED', 'message': f'S3 Upload Failed for file {idx + 1}'}
+                )
+            
+            print(f"✅ Uploaded to S3: {s3_url}")
+            s3_urls.append(s3_url)
 
-        # 4. Analyze with Gemini
-        # We pass the optimized bytes to save API tokens
-        ai_data = await analyze_charger_image(optimized_content)
+        # 3. Call AI ONCE with ALL images
+        # This enables "Multi-Image Synthesis"
+        print(f"🤖 Analyzing {len(optimized_images)} images with AI...")
+        ai_data = await analyze_multiple_images(optimized_images)
         
-        return {
-            "filename": file.filename,
-            "image_url": s3_url,
-            "ai_data": ai_data
+        if not ai_data:
+            # Fallback if AI fails
+            print("⚠️ AI analysis returned no data, using fallback")
+            ai_data = {
+                "socket_type": "UNKNOWN",
+                "marketing_description": "Manual verification required."
+            }
+        else:
+            print(f"✅ AI analysis complete: {ai_data.get('socket_type', 'N/A')}")
+
+        # 4. Return aggregated result
+        result = {
+            "image_urls": s3_urls,  # Return all URLs
+            "ai_data": ai_data      # Single synthesized result
         }
+        print(f"📤 Returning response with {len(s3_urls)} URLs")
+        return result
         
     except HTTPException:
         raise
     except Exception as e:
+        print(f"❌ Error in analyze_photo: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={'code': 'PROCESSING_ERROR', 'message': str(e)}
