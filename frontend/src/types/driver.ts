@@ -29,6 +29,7 @@ export interface DriverLegendItem {
 export interface DriverBookingConfig {
   serviceFee: number;
   timeSlots: string[];
+  slotDurationMinutes: number;
 }
 
 export interface DriverConfig {

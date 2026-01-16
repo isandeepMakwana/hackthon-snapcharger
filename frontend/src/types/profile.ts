@@ -13,6 +13,8 @@ export interface DriverProfile extends DriverProfileInput {
 export interface HostProfileInput {
   parkingType: 'covered' | 'open' | 'shared';
   parkingAddress?: string;
+  parkingLat?: number;
+  parkingLng?: number;
 }
 
 export interface HostProfile extends HostProfileInput {

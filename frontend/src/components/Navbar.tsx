@@ -1,10 +1,10 @@
 import { ChevronDown, LogOut, MapPin, Menu, User, Zap } from 'lucide-react';
 import { INITIAL_USER_AVATAR } from '@/data/mockStations';
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 
 interface NavbarProps {
-  viewMode: 'driver' | 'host';
-  setViewMode: (mode: 'driver' | 'host') => void;
+  viewSwitcher: ReactNode;
   isAuthenticated: boolean;
   onLoginClick: () => void;
   onLogout: () => void;
@@ -13,8 +13,7 @@ interface NavbarProps {
 }
 
 const Navbar = ({
-  viewMode,
-  setViewMode,
+  viewSwitcher,
   isAuthenticated,
   onLoginClick,
   onLogout,
@@ -24,7 +23,7 @@ const Navbar = ({
   const [showMenu, setShowMenu] = useState(false);
 
   return (
-    <nav className="relative z-[1100] flex h-16 items-center justify-between border-b border-border bg-surface-strong/90 px-4 backdrop-blur sm:px-6">
+    <nav className="relative z-[1100] grid h-16 grid-cols-[1fr_auto_1fr] items-center border-b border-border bg-surface-strong/90 px-4 backdrop-blur sm:px-6">
       <div className="flex items-center gap-3">
         <div className="rounded-lg bg-emerald-500 p-1.5 text-white">
           <Zap size={20} fill="currentColor" aria-hidden="true" />
@@ -37,38 +36,9 @@ const Navbar = ({
         </div>
       </div>
 
-      <div
-        className="flex items-center gap-2 rounded-full border border-border bg-surface px-1.5 py-1 text-xs font-semibold"
-        role="group"
-        aria-label="Switch dashboard role"
-      >
-        <button
-          type="button"
-          onClick={() => setViewMode('driver')}
-          aria-pressed={viewMode === 'driver'}
-          className={`rounded-full px-4 py-1.5 transition-colors ${
-            viewMode === 'driver'
-              ? 'bg-surface-strong text-ink shadow-soft'
-              : 'text-muted hover:text-ink'
-          }`}
-        >
-          Driver
-        </button>
-        <button
-          type="button"
-          onClick={() => setViewMode('host')}
-          aria-pressed={viewMode === 'host'}
-          className={`rounded-full px-4 py-1.5 transition-colors ${
-            viewMode === 'host'
-              ? 'bg-surface-strong text-ink shadow-soft'
-              : 'text-muted hover:text-ink'
-          }`}
-        >
-          Host
-        </button>
-      </div>
+      <div className="flex items-center justify-self-center">{viewSwitcher}</div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center justify-self-end gap-3">
         {locationLabel && (
           <div className="hidden items-center gap-1 rounded-full border border-border bg-surface px-3 py-1 text-xs font-semibold text-muted sm:flex">
             <MapPin size={12} aria-hidden="true" />

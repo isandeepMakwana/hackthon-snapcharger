@@ -89,30 +89,36 @@ const MapCanvas = ({
 
     stations.forEach((station) => {
       const isSelected = station.id === selectedStationId;
+      const statusColor =
+        station.status === StationStatus.AVAILABLE
+          ? '#10b981'
+          : station.status === StationStatus.BUSY
+            ? '#f43f5e'
+            : '#94a3b8';
+      const iconSize = isSelected ? 34 : 28;
       const iconHtml = `
-        <div class="relative flex items-center justify-center transition-all duration-300 ${
-          isSelected ? 'scale-125 z-50' : 'scale-100'
-        }">
+        <div class="leaflet-station-wrapper" style="transform: scale(${isSelected ? 1.12 : 1});">
           ${
             station.status === StationStatus.AVAILABLE
-              ? '<div class="absolute inset-0 bg-emerald-400 rounded-full animate-ping opacity-75 w-full h-full"></div>'
+              ? '<div class="leaflet-station-pulse"></div>'
               : ''
           }
-          <div class="relative w-3.5 h-3.5 rounded-full border-2 border-white shadow-md ${
-            station.status === StationStatus.AVAILABLE
-              ? 'bg-emerald-500'
-              : station.status === StationStatus.BUSY
-                ? 'bg-rose-500'
-                : 'bg-slate-400'
-          }"></div>
+          <div
+            class="leaflet-station-icon"
+            style="background:${statusColor}; width:${iconSize}px; height:${iconSize}px;"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="#ffffff" d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"></path>
+            </svg>
+          </div>
         </div>
       `;
 
       const icon = leaflet.divIcon({
         className: 'leaflet-custom-marker',
         html: iconHtml,
-        iconSize: [20, 20],
-        iconAnchor: [10, 10],
+        iconSize: [iconSize, iconSize],
+        iconAnchor: [iconSize / 2, iconSize / 2],
       });
 
       const marker = leaflet.marker([station.lat, station.lng], { icon });

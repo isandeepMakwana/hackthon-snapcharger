@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
 import Navbar from '@/components/Navbar';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useStationStore } from '@/store/useStationStore';
 import LoginPage from '@/features/auth/LoginPage';
 import RegisterPage from '@/features/auth/RegisterPage';
@@ -240,10 +241,18 @@ const App = () => {
       >
         Skip to content
       </a>
-      <div className="app-content min-h-screen flex flex-col">
+      <Tabs
+        value={viewMode}
+        onValueChange={(value) => handleViewModeChange(value as 'driver' | 'host')}
+        className="app-content min-h-screen flex flex-col"
+      >
         <Navbar
-          viewMode={viewMode}
-          setViewMode={handleViewModeChange}
+          viewSwitcher={
+            <TabsList aria-label="Switch dashboard role">
+              <TabsTrigger value="driver">Driver</TabsTrigger>
+              <TabsTrigger value="host">Host</TabsTrigger>
+            </TabsList>
+          }
           isAuthenticated={authState === 'authenticated'}
           onLoginClick={() => handleLoginRequest('general')}
           onLogout={handleLogout}
@@ -279,7 +288,7 @@ const App = () => {
             }
           }}
         />
-        <main id="main-content" className="flex-1 overflow-hidden">
+        <main id="main-content" className="flex-1 min-h-0 overflow-hidden">
           <Suspense
             fallback={
               <div className="flex h-full items-center justify-center">
@@ -290,7 +299,7 @@ const App = () => {
               </div>
             }
           >
-            {viewMode === 'driver' ? (
+            <TabsContent value="driver" className="h-full">
               <DriverView
                 isLoggedIn={authState === 'authenticated'}
                 onLoginRequest={handleLoginRequest}
@@ -305,12 +314,13 @@ const App = () => {
                   }
                 }}
               />
-            ) : (
+            </TabsContent>
+            <TabsContent value="host" className="h-full">
               <HostView />
-            )}
+            </TabsContent>
           </Suspense>
         </main>
-      </div>
+      </Tabs>
     </div>
   );
 };
