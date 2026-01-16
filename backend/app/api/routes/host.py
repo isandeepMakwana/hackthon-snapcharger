@@ -30,13 +30,24 @@ async def get_stats(
     if not stations:
         return HostStats(total_earnings=0, active_bookings=0, station_health=0)
 
-    total_earnings = sum(station.monthly_earnings for station in stations)
+    # Calculate total earnings from COMPLETED bookings
+    station_ids = [station.id for station in stations]
+    completed_bookings = db.query(Booking, Station).join(
+        Station, Booking.station_id == Station.id
+    ).filter(
+        Booking.host_id == current_user.id,
+        Booking.status == 'COMPLETED',
+        Booking.station_id.in_(station_ids)
+    ).all()
+    
+    total_earnings = sum(station.price_per_hour for _, station in completed_bookings)
+    
     active_bookings = db.query(Booking).filter(
         Booking.host_id == current_user.id,
         Booking.status == 'ACTIVE'
     ).count()
     online = sum(1 for station in stations if station.status != StationStatus.OFFLINE.value)
-    station_health = round((online / len(stations)) * 100)
+    station_health = round((online / len(stations)) * 100) if stations else 0
 
     return HostStats(
         total_earnings=total_earnings,

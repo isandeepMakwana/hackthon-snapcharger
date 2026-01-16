@@ -373,7 +373,6 @@ async def create_booking(
         start_time=payload.start_time
     ))
 
-    station.monthly_earnings += station.price_per_hour
     db.commit()
     db.refresh(station)
 
