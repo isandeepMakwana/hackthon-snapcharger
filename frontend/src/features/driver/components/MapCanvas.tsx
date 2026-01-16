@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Map as LeafletMap, Marker } from 'leaflet';
 import { Crosshair } from 'lucide-react';
 import type { Station } from '@/types';
@@ -26,6 +26,7 @@ const MapCanvas = ({
   const mapInstanceRef = useRef<LeafletMap | null>(null);
   const markersRef = useRef<Marker[]>([]);
   const leafletRef = useRef<typeof import('leaflet') | null>(null);
+  const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -67,6 +68,7 @@ const MapCanvas = ({
 
       map.on('click', () => onClearSelection());
       mapInstanceRef.current = map;
+      setMapReady(true);
     };
 
     void initializeMap();
@@ -77,11 +79,12 @@ const MapCanvas = ({
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
       }
+      setMapReady(false);
     };
   }, [onClearSelection, userLocation.lat, userLocation.lng]);
 
   useEffect(() => {
-    if (!mapInstanceRef.current || !leafletRef.current) return;
+    if (!mapReady || !mapInstanceRef.current || !leafletRef.current) return;
     const leaflet = leafletRef.current;
 
     markersRef.current.forEach((marker) => marker.remove());
@@ -98,6 +101,7 @@ const MapCanvas = ({
       const iconSize = isSelected ? 34 : 28;
       const iconHtml = `
         <div class="leaflet-station-wrapper" style="transform: scale(${isSelected ? 1.12 : 1});">
+          ${isSelected ? '<div class="leaflet-station-highlight"></div>' : ''}
           ${
             station.status === StationStatus.AVAILABLE
               ? '<div class="leaflet-station-pulse"></div>'
@@ -121,20 +125,29 @@ const MapCanvas = ({
         iconAnchor: [iconSize / 2, iconSize / 2],
       });
 
-      const marker = leaflet.marker([station.lat, station.lng], { icon });
+      const marker = leaflet.marker([station.lat, station.lng], {
+        icon,
+        zIndexOffset: isSelected ? 600 : 0,
+      });
       marker.on('click', () => onSelectStation(station));
       marker.addTo(mapInstanceRef.current!);
       markersRef.current.push(marker);
     });
-  }, [stations, selectedStationId, onSelectStation]);
+  }, [mapReady, stations, selectedStationId, onSelectStation]);
 
   useEffect(() => {
-    if (!mapInstanceRef.current || !selectedStationId) return;
+    if (!mapReady || !mapInstanceRef.current || !selectedStationId) return;
     const station = stations.find((item) => item.id === selectedStationId);
     if (!station) return;
-    // Pan to station without changing zoom level to keep all stations visible
-    mapInstanceRef.current.panTo([station.lat, station.lng], { animate: true, duration: 1 });
-  }, [selectedStationId, stations]);
+    const map = mapInstanceRef.current;
+    const currentZoom = map.getZoom();
+    const targetZoom = Math.max(currentZoom, 14);
+    map.flyTo([station.lat, station.lng], targetZoom, {
+      animate: true,
+      duration: 1.2,
+      easeLinearity: 0.25,
+    });
+  }, [mapReady, selectedStationId, stations]);
 
   const handleRecenter = () => {
     if (mapInstanceRef.current) {
