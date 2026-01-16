@@ -8,6 +8,7 @@ import { StationStatus } from '@/types';
 import { useStationStore } from '@/store/useStationStore';
 import type { HostBooking } from '@/types/booking';
 import { createHostStation, fetchHostBookings, fetchHostStats, fetchHostStations, updateHostStation } from '@/services/hostService';
+import { fetchDriverConfig } from '@/services/driverService';
 
 const AddStationModal = lazy(() => import('@/features/host/AddStationModal'));
 
@@ -23,6 +24,8 @@ const HostView = () => {
   const [editingStation, setEditingStation] = useState<Station | undefined>();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [bookings, setBookings] = useState<HostBooking[]>([]);
+  const [timeSlots, setTimeSlots] = useState<string[]>([]);
+  const [updatingStations, setUpdatingStations] = useState<Set<string>>(new Set());
 
   const myStations = useMemo(() => stations, [stations]);
 
@@ -40,15 +43,17 @@ const HostView = () => {
 
     const loadHostData = async () => {
       try {
-        const [stationData, statsData, bookingData] = await Promise.all([
+        const [stationData, statsData, bookingData, driverConfig] = await Promise.all([
           fetchHostStations(),
           fetchHostStats(),
-          fetchHostBookings()
+          fetchHostBookings(),
+          fetchDriverConfig()
         ]);
         if (!isMounted) return;
         loadStations(stationData);
         setHostStats(statsData);
         setBookings(bookingData);
+        setTimeSlots(driverConfig.booking.timeSlots ?? []);
         setErrorMessage(null);
       } catch {
         if (!isMounted) return;
@@ -87,6 +92,8 @@ const HostView = () => {
       lng: stationData.lng ?? 73.8567,
       phoneNumber: stationData.phoneNumber,
       supportedVehicleTypes: stationData.supportedVehicleTypes ?? ['2W', '4W'],
+      availableTimeSlots: stationData.availableTimeSlots ?? [],
+      blockedTimeSlots: stationData.blockedTimeSlots ?? [],
     };
 
     try {
@@ -104,10 +111,13 @@ const HostView = () => {
 
   const handleToggleStatus = async (stationId: string) => {
     const target = stations.find((station) => station.id === stationId);
-    if (!target) return;
+    if (!target || updatingStations.has(stationId)) return;
 
     const nextStatus =
       target.status === StationStatus.OFFLINE ? StationStatus.AVAILABLE : StationStatus.OFFLINE;
+
+    setUpdatingStations((prev) => new Set(prev).add(stationId));
+    toggleStationStatus(stationId);
 
     try {
       const updated = await updateHostStation(stationId, { status: nextStatus });
@@ -117,11 +127,17 @@ const HostView = () => {
     } catch {
       toggleStationStatus(stationId);
       setErrorMessage('Unable to update station status. Please check your login and try again.');
+    } finally {
+      setUpdatingStations((prev) => {
+        const next = new Set(prev);
+        next.delete(stationId);
+        return next;
+      });
     }
   };
 
   return (
-    <div className="flex h-[calc(100vh-64px)] flex-col overflow-y-auto bg-surface">
+    <div className="flex h-full flex-col overflow-y-auto bg-surface">
       <div className="px-4 pt-6 md:px-6">
         {errorMessage && (
           <div
@@ -202,6 +218,7 @@ const HostView = () => {
               station={station}
               onToggleStatus={handleToggleStatus}
               onEdit={handleEditClick}
+              isUpdating={updatingStations.has(station.id)}
             />
           ))}
         </div>
@@ -213,6 +230,7 @@ const HostView = () => {
           onClose={() => setIsModalOpen(false)}
           onAddStation={handleSaveStation}
           initialData={editingStation}
+          timeSlots={timeSlots}
         />
       </Suspense>
     </div>

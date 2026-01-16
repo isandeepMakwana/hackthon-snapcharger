@@ -9,6 +9,7 @@ interface AddStationModalProps {
   onClose: () => void;
   onAddStation: (stationData: Partial<Station>) => void;
   initialData?: Station;
+  timeSlots: string[];
 }
 
 type Step = 'upload' | 'analyzing' | 'review';
@@ -18,6 +19,7 @@ const AddStationModal = ({
   onClose,
   onAddStation,
   initialData,
+  timeSlots,
 }: AddStationModalProps) => {
   const [step, setStep] = useState<Step>('upload');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -31,6 +33,8 @@ const AddStationModal = ({
     powerOutput: '',
     pricePerHour: '150',
     supportedVehicleTypes: ['2W', '4W'] as Array<'2W' | '4W'>,
+    blockedTimeSlots: [] as string[],
+    availableTimeSlots: [] as string[],
   });
 
   useEffect(() => {
@@ -51,6 +55,10 @@ const AddStationModal = ({
         powerOutput: initialData.powerOutput,
         pricePerHour: String(initialData.pricePerHour),
         supportedVehicleTypes: (initialData.supportedVehicleTypes as Array<'2W' | '4W'>) ?? ['2W', '4W'],
+        blockedTimeSlots: initialData.blockedTimeSlots ?? [],
+        availableTimeSlots: (initialData.availableTimeSlots && initialData.availableTimeSlots.length > 0)
+          ? initialData.availableTimeSlots
+          : timeSlots,
       });
       setSelectedImage(initialData.image);
       setStep('review');
@@ -63,12 +71,22 @@ const AddStationModal = ({
         powerOutput: '',
         pricePerHour: '150',
         supportedVehicleTypes: ['2W', '4W'],
+        blockedTimeSlots: [],
+        availableTimeSlots: timeSlots,
       });
       setSelectedImage(null);
       setAnalysisData(null);
       setStep('upload');
     }
   }, [isOpen, initialData]);
+
+  useEffect(() => {
+    if (!isOpen || timeSlots.length === 0) return;
+    setFormData((prev) => {
+      if (prev.availableTimeSlots.length > 0) return prev;
+      return { ...prev, availableTimeSlots: timeSlots };
+    });
+  }, [isOpen, timeSlots]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -157,6 +175,8 @@ const AddStationModal = ({
       pricePerHour: Number(formData.pricePerHour),
       image: selectedImage || '',
       supportedVehicleTypes: formData.supportedVehicleTypes,
+      blockedTimeSlots: formData.blockedTimeSlots,
+      availableTimeSlots: formData.availableTimeSlots,
     });
     onClose();
   };
@@ -167,6 +187,24 @@ const AddStationModal = ({
         ? prev.supportedVehicleTypes.filter((item) => item !== value)
         : [...prev.supportedVehicleTypes, value];
       return { ...prev, supportedVehicleTypes: next.length ? next : prev.supportedVehicleTypes };
+    });
+  };
+
+  const toggleBlockedSlot = (slot: string) => {
+    setFormData((prev) => {
+      const next = prev.blockedTimeSlots.includes(slot)
+        ? prev.blockedTimeSlots.filter((item) => item !== slot)
+        : [...prev.blockedTimeSlots, slot];
+      return { ...prev, blockedTimeSlots: next };
+    });
+  };
+
+  const toggleAvailableSlot = (slot: string) => {
+    setFormData((prev) => {
+      const next = prev.availableTimeSlots.includes(slot)
+        ? prev.availableTimeSlots.filter((item) => item !== slot)
+        : [...prev.availableTimeSlots, slot];
+      return { ...prev, availableTimeSlots: next };
     });
   };
 
@@ -365,6 +403,54 @@ const AddStationModal = ({
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase text-muted">Available time slots</p>
+                {timeSlots.length === 0 ? (
+                  <p className="mt-2 text-xs text-muted">No time slots available.</p>
+                ) : (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {timeSlots.map((slot) => (
+                      <button
+                        key={slot}
+                        type="button"
+                        onClick={() => toggleAvailableSlot(slot)}
+                        className={`rounded-full border px-3 py-2 text-xs font-semibold transition ${
+                          formData.availableTimeSlots.includes(slot)
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                            : 'border-border text-muted hover:text-ink'
+                        }`}
+                      >
+                        {slot}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase text-muted">Blocked time slots</p>
+                {timeSlots.length === 0 ? (
+                  <p className="mt-2 text-xs text-muted">No time slots available.</p>
+                ) : (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {timeSlots.map((slot) => (
+                      <button
+                        key={slot}
+                        type="button"
+                        onClick={() => toggleBlockedSlot(slot)}
+                        className={`rounded-full border px-3 py-2 text-xs font-semibold transition ${
+                          formData.blockedTimeSlots.includes(slot)
+                            ? 'border-rose-200 bg-rose-50 text-rose-700'
+                            : 'border-border text-muted hover:text-ink'
+                        }`}
+                      >
+                        {slot}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {selectedImage && (

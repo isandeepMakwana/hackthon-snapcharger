@@ -6,9 +6,10 @@ interface HostStationCardProps {
   station: Station;
   onToggleStatus: (id: string) => void;
   onEdit: (station: Station) => void;
+  isUpdating?: boolean;
 }
 
-const HostStationCard = ({ station, onToggleStatus, onEdit }: HostStationCardProps) => {
+const HostStationCard = ({ station, onToggleStatus, onEdit, isUpdating }: HostStationCardProps) => {
   const isOnline = station.status !== StationStatus.OFFLINE;
 
   return (
@@ -48,12 +49,13 @@ const HostStationCard = ({ station, onToggleStatus, onEdit }: HostStationCardPro
         </div>
 
         <div className="mt-4 flex items-center justify-between">
-          <label className="flex cursor-pointer items-center text-sm text-muted">
+          <label className={`flex items-center text-sm text-muted ${isUpdating ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
             <span className="sr-only">Toggle station availability</span>
             <input
               type="checkbox"
               className="sr-only"
               checked={isOnline}
+              disabled={isUpdating}
               onChange={() => onToggleStatus(station.id)}
             />
             <span

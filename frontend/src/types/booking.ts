@@ -7,6 +7,7 @@ export interface HostBooking {
   driverId: string;
   driverName: string;
   driverPhoneNumber: string;
+  bookingDate?: string | null;
   startTime?: string | null;
   status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
   createdAt: string;

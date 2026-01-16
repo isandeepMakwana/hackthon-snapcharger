@@ -21,7 +21,9 @@ export const MOCK_STATIONS: Station[] = [
     distance: '0.8 km',
     phoneNumber: '+919876543210',
     supportedVehicleTypes: ['2W', '4W'],
-    bookedTimeSlots: ['10:00 AM', '12:00 PM']
+    bookedTimeSlots: ['10:00 AM', '12:00 PM'],
+    blockedTimeSlots: ['3:00 PM'],
+    availableTimeSlots: ['8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM']
   },
   {
     id: '2',
@@ -42,7 +44,9 @@ export const MOCK_STATIONS: Station[] = [
     distance: '12 km',
     phoneNumber: '+919876543211',
     supportedVehicleTypes: ['2W', '4W'],
-    bookedTimeSlots: ['2:00 PM']
+    bookedTimeSlots: ['2:00 PM'],
+    blockedTimeSlots: [],
+    availableTimeSlots: []
   },
   {
     id: '3',
@@ -63,7 +67,9 @@ export const MOCK_STATIONS: Station[] = [
     distance: '5.1 km',
     phoneNumber: '+919876543212',
     supportedVehicleTypes: ['2W', '4W'],
-    bookedTimeSlots: []
+    bookedTimeSlots: [],
+    blockedTimeSlots: ['11:00 AM'],
+    availableTimeSlots: ['9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '1:00 PM']
   },
   {
     id: '4',
@@ -84,7 +90,9 @@ export const MOCK_STATIONS: Station[] = [
     distance: '3.2 km',
     phoneNumber: '+919876543213',
     supportedVehicleTypes: ['2W', '4W'],
-    bookedTimeSlots: []
+    bookedTimeSlots: [],
+    blockedTimeSlots: [],
+    availableTimeSlots: []
   },
   {
     id: '5',
@@ -105,7 +113,9 @@ export const MOCK_STATIONS: Station[] = [
     distance: '4.5 km',
     phoneNumber: '+919876543214',
     supportedVehicleTypes: ['2W', '4W'],
-    bookedTimeSlots: []
+    bookedTimeSlots: [],
+    blockedTimeSlots: [],
+    availableTimeSlots: []
   },
   {
     id: '6',
@@ -126,7 +136,9 @@ export const MOCK_STATIONS: Station[] = [
     distance: '6.2 km',
     phoneNumber: '+919876543215',
     supportedVehicleTypes: ['2W', '4W'],
-    bookedTimeSlots: []
+    bookedTimeSlots: [],
+    blockedTimeSlots: [],
+    availableTimeSlots: []
   },
   {
     id: '7',
@@ -147,7 +159,9 @@ export const MOCK_STATIONS: Station[] = [
     distance: '8.1 km',
     phoneNumber: '+919876543216',
     supportedVehicleTypes: ['2W', '4W'],
-    bookedTimeSlots: []
+    bookedTimeSlots: [],
+    blockedTimeSlots: [],
+    availableTimeSlots: []
   },
   {
     id: '8',
@@ -168,7 +182,9 @@ export const MOCK_STATIONS: Station[] = [
     distance: '7.5 km',
     phoneNumber: '+919876543217',
     supportedVehicleTypes: ['2W', '4W'],
-    bookedTimeSlots: []
+    bookedTimeSlots: [],
+    blockedTimeSlots: [],
+    availableTimeSlots: []
   }
 ];
 

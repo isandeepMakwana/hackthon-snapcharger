@@ -1,16 +1,22 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { action } from '@storybook/addon-actions';
 import Navbar from '@/components/Navbar';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const meta: Meta<typeof Navbar> = {
   title: 'Components/Navbar',
   component: Navbar,
   args: {
-    setViewMode: action('setViewMode'),
     onLoginClick: action('onLoginClick'),
     onLogout: action('onLogout'),
     isAuthenticated: false,
     authRole: null,
+    viewSwitcher: (
+      <TabsList aria-label="Switch dashboard role">
+        <TabsTrigger value="driver">Driver</TabsTrigger>
+        <TabsTrigger value="host">Host</TabsTrigger>
+      </TabsList>
+    ),
   },
 };
 
@@ -20,15 +26,23 @@ type Story = StoryObj<typeof Navbar>;
 
 export const Driver: Story = {
   args: {
-    viewMode: 'driver',
     isAuthenticated: false,
   },
+  render: (args) => (
+    <Tabs defaultValue="driver">
+      <Navbar {...args} />
+    </Tabs>
+  ),
 };
 
 export const Host: Story = {
   args: {
-    viewMode: 'host',
     isAuthenticated: true,
     authRole: 'host',
   },
+  render: (args) => (
+    <Tabs defaultValue="host">
+      <Navbar {...args} />
+    </Tabs>
+  ),
 };

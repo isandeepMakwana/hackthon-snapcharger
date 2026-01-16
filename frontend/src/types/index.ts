@@ -29,6 +29,8 @@ export interface Station {
   phoneNumber?: string; // New field for Call feature
   supportedVehicleTypes?: string[];
   bookedTimeSlots?: string[];
+  blockedTimeSlots?: string[];
+  availableTimeSlots?: string[];
 }
 
 export interface HostStats {
