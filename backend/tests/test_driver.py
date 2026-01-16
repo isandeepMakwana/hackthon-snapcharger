@@ -1,3 +1,8 @@
+from datetime import date
+
+TODAY = date.today().isoformat()
+
+
 def register_user(client, role: str, overrides=None):
     payload = {
         'username': f'{role}user',
@@ -50,7 +55,8 @@ def create_station_for_host(client, headers, overrides=None):
         'lng': 73.8567,
         'status': 'AVAILABLE',
         'monthlyEarnings': 1000,
-        'supportedVehicleTypes': ['2W', '4W']
+        'supportedVehicleTypes': ['2W', '4W'],
+        'blockedTimeSlots': []
     }
     if overrides:
         payload.update(overrides)
@@ -78,6 +84,7 @@ def test_driver_booking_updates_station(client):
         '/api/driver/bookings',
         json={
             'stationId': station['id'],
+            'bookingDate': TODAY,
             'startTime': '10:00 AM',
             'userLat': 18.5204,
             'userLng': 73.8567
@@ -99,7 +106,7 @@ def test_driver_booking_rejects_unavailable_station(client):
 
     response = client.post(
         '/api/driver/bookings',
-        json={'stationId': station['id'], 'startTime': '10:00 AM'},
+        json={'stationId': station['id'], 'bookingDate': TODAY, 'startTime': '10:00 AM'},
         headers=headers
     )
     assert response.status_code == 400
@@ -113,18 +120,32 @@ def test_driver_booking_rejects_time_slot_conflict(client):
 
     first_response = client.post(
         '/api/driver/bookings',
-        json={'stationId': station['id'], 'startTime': '10:00 AM'},
+        json={'stationId': station['id'], 'bookingDate': TODAY, 'startTime': '10:00 AM'},
         headers=headers
     )
     assert first_response.status_code == 200
 
     second_response = client.post(
         '/api/driver/bookings',
-        json={'stationId': station['id'], 'startTime': '10:00 AM'},
+        json={'stationId': station['id'], 'bookingDate': TODAY, 'startTime': '10:00 AM'},
         headers=headers
     )
     assert second_response.status_code == 409
     assert second_response.json()['error']['code'] == 'TIME_SLOT_UNAVAILABLE'
+
+
+def test_driver_booking_rejects_blocked_slot(client):
+    host_headers = auth_headers_for_role(client, 'host')
+    station = create_station_for_host(client, host_headers, {'blockedTimeSlots': ['10:00 AM']})
+    headers = auth_headers_for_role(client, 'driver')
+
+    response = client.post(
+        '/api/driver/bookings',
+        json={'stationId': station['id'], 'bookingDate': TODAY, 'startTime': '10:00 AM'},
+        headers=headers
+    )
+    assert response.status_code == 400
+    assert response.json()['error']['code'] == 'TIME_SLOT_BLOCKED'
 
 
 def test_driver_booking_requires_profile(client):
@@ -134,7 +155,7 @@ def test_driver_booking_requires_profile(client):
 
     booking_response = client.post(
         '/api/driver/bookings',
-        json={'stationId': station['id'], 'startTime': '10:00 AM'},
+        json={'stationId': station['id'], 'bookingDate': TODAY, 'startTime': '10:00 AM'},
         headers=headers
     )
     assert booking_response.status_code == 403

@@ -1,3 +1,8 @@
+from datetime import date
+
+TODAY = date.today().isoformat()
+
+
 def register_host(client, overrides=None):
     payload = {
         'username': 'hostone',
@@ -16,19 +21,6 @@ def register_driver(client, overrides=None):
         'email': 'driver@example.com',
         'password': 'Password123!',
         'phoneNumber': '+919811112266'
-    }
-    if overrides:
-        payload.update(overrides)
-    return client.post('/api/auth/register', json=payload)
-
-
-def register_driver(client, overrides=None):
-    payload = {
-        'username': 'driverone',
-        'email': 'driver@example.com',
-        'password': 'Password123!',
-        'phoneNumber': '+919811112266',
-        'role': 'driver'
     }
     if overrides:
         payload.update(overrides)
@@ -59,12 +51,6 @@ def auth_headers_for_driver(client):
     return headers
 
 
-def auth_headers_for_driver(client):
-    response = register_driver(client)
-    access_token = response.json()['tokens']['accessToken']
-    return {'Authorization': f'Bearer {access_token}'}
-
-
 def test_host_station_crud_and_stats(client):
     headers = auth_headers(client)
 
@@ -80,7 +66,8 @@ def test_host_station_crud_and_stats(client):
         'lng': 73.8567,
         'phoneNumber': '+919999999999',
         'monthlyEarnings': 5000,
-        'status': 'AVAILABLE'
+        'status': 'AVAILABLE',
+        'blockedTimeSlots': []
     }
 
     create_response = client.post('/api/host/stations', json=create_payload, headers=headers)
@@ -90,7 +77,7 @@ def test_host_station_crud_and_stats(client):
     driver_headers = auth_headers_for_driver(client)
     booking_response = client.post(
         '/api/driver/bookings',
-        json={'stationId': station_id},
+        json={'stationId': station_id, 'bookingDate': TODAY, 'startTime': '10:00 AM'},
         headers=driver_headers
     )
     assert booking_response.status_code == 200
@@ -164,7 +151,7 @@ def test_host_bookings_include_driver_contact(client):
     driver_headers = auth_headers_for_driver(client)
     booking_response = client.post(
         '/api/driver/bookings',
-        json={'stationId': station_id, 'startTime': '10:00 AM'},
+        json={'stationId': station_id, 'bookingDate': TODAY, 'startTime': '10:00 AM'},
         headers=driver_headers
     )
     assert booking_response.status_code == 200
@@ -175,3 +162,4 @@ def test_host_bookings_include_driver_contact(client):
     assert len(payload) == 1
     assert payload[0]['driverPhoneNumber'] == '+919811112266'
     assert payload[0]['stationTitle'] == 'Contact Station'
+    assert payload[0]['bookingDate'] == TODAY
