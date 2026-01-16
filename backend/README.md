@@ -46,3 +46,7 @@ The API will be available at `http://localhost:8000`.
 From `backend/`:
 
 - `pytest`
+
+## MCP Server
+
+See `backend/MCP.md` for setup and usage of the SnapCharge MCP server (FastMCP).
