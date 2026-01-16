@@ -3,7 +3,7 @@ from app.db.models.user import User
 from app.security import hash_password
 
 
-def create_user(username, email, password, role='driver', permissions=None, phone_number='+919811112233'):
+def create_user(username, email, password, role='member', permissions=None, phone_number='+919811112233'):
     db = SessionLocal()
     user = User(
         username=username,

@@ -1,4 +1,3 @@
-from typing import Optional
 from pydantic import EmailStr, Field
 from app.models.base import CamelModel
 from app.models.user import UserOut
@@ -9,7 +8,6 @@ class RegisterRequest(CamelModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     phone_number: str = Field(min_length=7, max_length=30)
-    role: Optional[str] = 'driver'
 
 
 class LoginRequest(CamelModel):

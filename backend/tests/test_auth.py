@@ -7,8 +7,7 @@ def register_user(client, overrides=None):
         'username': 'driverone',
         'email': 'driver@example.com',
         'password': 'Password123!',
-        'phoneNumber': '+919811112233',
-        'role': 'driver'
+        'phoneNumber': '+919811112233'
     }
     if overrides:
         payload.update(overrides)
@@ -123,3 +122,5 @@ def test_me_returns_user(client):
     response = client.get('/api/auth/me', headers={'Authorization': f'Bearer {access_token}'})
     assert response.status_code == 200
     assert response.json()['email'] == 'driver@example.com'
+    assert response.json()['driverProfileComplete'] is False
+    assert response.json()['hostProfileComplete'] is False

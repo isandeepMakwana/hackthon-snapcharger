@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, DateTime, Float, Integer, Text, ForeignKey
+from sqlalchemy import String, DateTime, Float, Integer, Text, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base
 
@@ -24,6 +24,11 @@ class Station(Base):
     lat: Mapped[float] = mapped_column(Float, nullable=False)
     lng: Mapped[float] = mapped_column(Float, nullable=False)
     phone_number: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    supported_vehicle_types: Mapped[list] = mapped_column(
+        JSON,
+        default=lambda: ['2W', '4W'],
+        nullable=False
+    )
     monthly_earnings: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(

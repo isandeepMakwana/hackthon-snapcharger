@@ -8,6 +8,8 @@ from starlette import status
 from app.db.session import SessionLocal
 from app.db.models.user import User
 from app.db.models.session import Session as DbSession
+from app.db.models.driver_profile import DriverProfile
+from app.db.models.host_profile import HostProfile
 from app.security import decode_access_token
 
 security_scheme = HTTPBearer(auto_error=False)
@@ -81,6 +83,36 @@ def require_role(*roles: List[str]):
         return user
 
     return dependency
+
+
+def require_driver_profile(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> User:
+    if user.role == 'admin':
+        return user
+    profile = db.query(DriverProfile).filter(DriverProfile.user_id == user.id).first()
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={'code': 'PROFILE_INCOMPLETE', 'message': 'Complete your driver profile to continue.'}
+        )
+    return user
+
+
+def require_host_profile(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> User:
+    if user.role == 'admin':
+        return user
+    profile = db.query(HostProfile).filter(HostProfile.user_id == user.id).first()
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={'code': 'PROFILE_INCOMPLETE', 'message': 'Complete your host profile to continue.'}
+        )
+    return user
 
 
 def require_self_or_admin(user_id: str, user: User = Depends(get_current_user)) -> User:

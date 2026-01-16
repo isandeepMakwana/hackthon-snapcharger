@@ -19,7 +19,9 @@ export const MOCK_STATIONS: Station[] = [
     lat: 18.5362,
     lng: 73.8940,
     distance: '0.8 km',
-    phoneNumber: '+919876543210'
+    phoneNumber: '+919876543210',
+    supportedVehicleTypes: ['2W', '4W'],
+    bookedTimeSlots: ['10:00 AM', '12:00 PM']
   },
   {
     id: '2',
@@ -38,7 +40,9 @@ export const MOCK_STATIONS: Station[] = [
     lat: 18.5913,
     lng: 73.7389,
     distance: '12 km',
-    phoneNumber: '+919876543211'
+    phoneNumber: '+919876543211',
+    supportedVehicleTypes: ['2W', '4W'],
+    bookedTimeSlots: ['2:00 PM']
   },
   {
     id: '3',
@@ -57,7 +61,9 @@ export const MOCK_STATIONS: Station[] = [
     lat: 18.5590,
     lng: 73.7868,
     distance: '5.1 km',
-    phoneNumber: '+919876543212'
+    phoneNumber: '+919876543212',
+    supportedVehicleTypes: ['2W', '4W'],
+    bookedTimeSlots: []
   },
   {
     id: '4',
@@ -76,7 +82,9 @@ export const MOCK_STATIONS: Station[] = [
     lat: 18.5196,
     lng: 73.8433,
     distance: '3.2 km',
-    phoneNumber: '+919876543213'
+    phoneNumber: '+919876543213',
+    supportedVehicleTypes: ['2W', '4W'],
+    bookedTimeSlots: []
   },
   {
     id: '5',
@@ -95,7 +103,9 @@ export const MOCK_STATIONS: Station[] = [
     lat: 18.5679,
     lng: 73.9143,
     distance: '4.5 km',
-    phoneNumber: '+919876543214'
+    phoneNumber: '+919876543214',
+    supportedVehicleTypes: ['2W', '4W'],
+    bookedTimeSlots: []
   },
   {
     id: '6',
@@ -114,7 +124,9 @@ export const MOCK_STATIONS: Station[] = [
     lat: 18.5074,
     lng: 73.8077,
     distance: '6.2 km',
-    phoneNumber: '+919876543215'
+    phoneNumber: '+919876543215',
+    supportedVehicleTypes: ['2W', '4W'],
+    bookedTimeSlots: []
   },
   {
     id: '7',
@@ -133,7 +145,9 @@ export const MOCK_STATIONS: Station[] = [
     lat: 18.5137,
     lng: 73.9274,
     distance: '8.1 km',
-    phoneNumber: '+919876543216'
+    phoneNumber: '+919876543216',
+    supportedVehicleTypes: ['2W', '4W'],
+    bookedTimeSlots: []
   },
   {
     id: '8',
@@ -152,7 +166,9 @@ export const MOCK_STATIONS: Station[] = [
     lat: 18.5635,
     lng: 73.8070,
     distance: '7.5 km',
-    phoneNumber: '+919876543217'
+    phoneNumber: '+919876543217',
+    supportedVehicleTypes: ['2W', '4W'],
+    bookedTimeSlots: []
   }
 ];
 

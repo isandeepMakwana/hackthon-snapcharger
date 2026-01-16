@@ -12,6 +12,16 @@ def format_error(code: str, message: str, details=None) -> dict:
     return {'error': payload}
 
 
+def _sanitize_error_details(details):
+    if isinstance(details, bytes):
+        return details.decode('utf-8', errors='replace')
+    if isinstance(details, list):
+        return [_sanitize_error_details(item) for item in details]
+    if isinstance(details, dict):
+        return {key: _sanitize_error_details(value) for key, value in details.items()}
+    return details
+
+
 def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
     detail = exc.detail
     if isinstance(detail, dict) and 'code' in detail and 'message' in detail:
@@ -25,7 +35,11 @@ def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSO
 def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
-        content=format_error('VALIDATION_ERROR', 'Request validation failed.', exc.errors())
+        content=format_error(
+            'VALIDATION_ERROR',
+            'Request validation failed.',
+            _sanitize_error_details(exc.errors())
+        )
     )
 
 

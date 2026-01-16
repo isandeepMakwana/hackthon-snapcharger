@@ -14,6 +14,15 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db() -> None:
     from app.db.base import Base
-    from app.db.models import user, session, email_verification, password_reset, station, booking
+    from app.db.models import (
+        user,
+        session,
+        email_verification,
+        password_reset,
+        station,
+        booking,
+        driver_profile,
+        host_profile
+    )
 
     Base.metadata.create_all(bind=engine)

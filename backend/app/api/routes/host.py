@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from starlette import status
-from app.api.deps import get_db, require_role
+from app.api.deps import get_db, require_host_profile
 from app.api.utils.stations import build_station_out
 from app.db.models.booking import Booking
 from app.db.models.station import Station
@@ -15,7 +15,7 @@ router = APIRouter(prefix='/api/host', tags=['host'])
 
 @router.get('/stats', response_model=HostStats)
 async def get_stats(
-    current_user: User = Depends(require_role('host', 'admin')),
+    current_user: User = Depends(require_host_profile),
     db: Session = Depends(get_db)
 ) -> HostStats:
     ensure_demo_stations_for_host(db, current_user)
@@ -41,7 +41,7 @@ async def get_stats(
 
 @router.get('/stations', response_model=list[StationOut])
 async def list_stations(
-    current_user: User = Depends(require_role('host', 'admin')),
+    current_user: User = Depends(require_host_profile),
     db: Session = Depends(get_db)
 ) -> list[StationOut]:
     ensure_demo_stations_for_host(db, current_user)
@@ -54,7 +54,7 @@ async def list_stations(
 @router.post('/stations', response_model=StationOut, status_code=status.HTTP_201_CREATED)
 async def create_station(
     payload: StationCreate,
-    current_user: User = Depends(require_role('host', 'admin')),
+    current_user: User = Depends(require_host_profile),
     db: Session = Depends(get_db)
 ) -> StationOut:
     image = payload.image.strip() if payload.image else ''
@@ -78,6 +78,7 @@ async def create_station(
         lat=payload.lat,
         lng=payload.lng,
         phone_number=station_phone,
+        supported_vehicle_types=payload.supported_vehicle_types,
         monthly_earnings=payload.monthly_earnings
     )
     db.add(station)
@@ -89,7 +90,7 @@ async def create_station(
 
 @router.get('/bookings', response_model=list[HostBookingOut])
 async def list_bookings(
-    current_user: User = Depends(require_role('host', 'admin')),
+    current_user: User = Depends(require_host_profile),
     db: Session = Depends(get_db)
 ) -> list[HostBookingOut]:
     rows = db.query(Booking, Station).join(
@@ -121,7 +122,7 @@ async def list_bookings(
 async def update_station(
     station_id: str,
     payload: StationUpdate,
-    current_user: User = Depends(require_role('host', 'admin')),
+    current_user: User = Depends(require_host_profile),
     db: Session = Depends(get_db)
 ) -> StationOut:
     query = db.query(Station).filter(Station.id == station_id)
@@ -162,7 +163,7 @@ async def update_station(
 
 @router.post('/analyze-photo')
 async def analyze_photo(
-    current_user: User = Depends(require_role('host', 'admin')),
+    current_user: User = Depends(require_host_profile),
     file: UploadFile | None = File(default=None)
 ) -> dict:
     return {

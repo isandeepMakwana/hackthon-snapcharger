@@ -3,6 +3,7 @@ import Navbar from '@/components/Navbar';
 import { useStationStore } from '@/store/useStationStore';
 import LoginPage from '@/features/auth/LoginPage';
 import RegisterPage from '@/features/auth/RegisterPage';
+import ProfileGateModal from '@/components/ProfileGateModal';
 import {
   clearAuthSession,
   fetchProfile,
@@ -16,7 +17,9 @@ import {
   requestPasswordReset,
   storeAuthSession,
 } from '@/services/authService';
-import type { AuthRole, AuthUser, StoredAuthSession } from '@/types/auth';
+import { saveDriverProfile, saveHostProfile } from '@/services/profileService';
+import type { AuthUser, StoredAuthSession } from '@/types/auth';
+import type { DriverProfileInput, HostProfileInput } from '@/types/profile';
 
 const DriverView = lazy(() => import('@/features/driver/DriverView'));
 const HostView = lazy(() => import('@/features/host/HostView'));
@@ -29,48 +32,73 @@ const App = () => {
   const setViewMode = useStationStore((state) => state.setViewMode);
   const driverConfig = useStationStore((state) => state.driverConfig);
   const [authState, setAuthState] = useState<AuthState>('guest');
-  const [authRole, setAuthRole] = useState<AuthRole | null>(null);
   const [authSession, setAuthSession] = useState<StoredAuthSession | null>(null);
   const [loginIntent, setLoginIntent] = useState<LoginIntent>('general');
   const [pendingBookingStationId, setPendingBookingStationId] = useState<string | null>(null);
+  const [profileGateMode, setProfileGateMode] = useState<'driver' | 'host' | null>(null);
+  const [pendingViewMode, setPendingViewMode] = useState<'driver' | 'host' | null>(null);
 
-  const resolveViewMode = (role: AuthRole) => (role === 'host' || role === 'admin' ? 'host' : 'driver');
+  const isAdmin = authSession?.user.role === 'admin';
+  const driverProfileComplete = Boolean(authSession?.user.driverProfileComplete);
+  const hostProfileComplete = Boolean(authSession?.user.hostProfileComplete);
 
   const applyAuthenticatedState = (user: AuthUser) => {
     setAuthState('authenticated');
-    setAuthRole(user.role);
-    if (pendingBookingStationId) {
-      setViewMode('driver');
+    const intent = loginIntent;
+    if (intent === 'host') {
+      setLoginIntent('general');
+      if (user.role === 'admin' || user.hostProfileComplete) {
+        setViewMode('host');
+      } else {
+        setPendingViewMode('host');
+        setProfileGateMode('host');
+      }
       return;
     }
-    setViewMode(resolveViewMode(user.role));
+    if (pendingBookingStationId) {
+      setLoginIntent('general');
+      setViewMode('driver');
+      if (!user.driverProfileComplete && user.role !== 'admin') {
+        setPendingViewMode('driver');
+        setProfileGateMode('driver');
+      }
+      return;
+    }
+    if (viewMode === 'host') {
+      setLoginIntent('general');
+      if (user.role === 'admin' || user.hostProfileComplete) {
+        setViewMode('host');
+      } else {
+        setPendingViewMode('host');
+        setProfileGateMode('host');
+      }
+      return;
+    }
+    if (!user.driverProfileComplete && user.role !== 'admin') {
+      setPendingViewMode('driver');
+      setProfileGateMode('driver');
+    }
+    setLoginIntent('general');
   };
 
-  const handleLogin = async (payload: { role: 'driver' | 'host'; email: string; password: string }) => {
+  const handleLogin = async (payload: { email: string; password: string }) => {
     const result = await loginUser({ email: payload.email, password: payload.password });
-    if (result.user.role !== payload.role && !(result.user.role === 'admin' && payload.role === 'host')) {
-      throw new Error(`This account is registered as a ${result.user.role}.`);
-    }
     const stored = storeAuthSession(result);
     setAuthSession(stored);
     applyAuthenticatedState(result.user);
   };
 
   const handleRegister = async (payload: {
-    role: 'driver' | 'host';
     username: string;
     email: string;
     phoneNumber: string;
     password: string;
-    vehicleModel?: string;
-    parkingType?: string;
   }) => {
     const result = await registerUser({
       username: payload.username,
       email: payload.email,
       password: payload.password,
-      phoneNumber: payload.phoneNumber,
-      role: payload.role,
+      phoneNumber: payload.phoneNumber
     });
     const stored = storeAuthSession(result);
     setAuthSession(stored);
@@ -86,9 +114,10 @@ const App = () => {
     clearAuthSession();
     setAuthSession(null);
     setAuthState('guest');
-    setAuthRole(null);
     setLoginIntent('general');
     setPendingBookingStationId(null);
+    setProfileGateMode(null);
+    setPendingViewMode(null);
     setViewMode('driver');
 
     if (refreshToken) {
@@ -98,11 +127,21 @@ const App = () => {
 
   const handleViewModeChange = (mode: 'driver' | 'host') => {
     if (mode === 'host') {
-      if (authState !== 'authenticated' || (authRole !== 'host' && authRole !== 'admin')) {
+      if (authState !== 'authenticated') {
         setLoginIntent('host');
         setAuthState('login');
         return;
       }
+      if (!hostProfileComplete && !isAdmin) {
+        setPendingViewMode('host');
+        setProfileGateMode('host');
+        return;
+      }
+    }
+    if (mode === 'driver' && authState === 'authenticated' && !driverProfileComplete && !isAdmin) {
+      setPendingViewMode('driver');
+      setProfileGateMode('driver');
+      return;
     }
     setViewMode(mode);
   };
@@ -150,7 +189,6 @@ const App = () => {
         if (!isActive) return;
         setAuthSession(null);
         setAuthState('guest');
-        setAuthRole(null);
       }
     };
 
@@ -166,17 +204,14 @@ const App = () => {
       loginIntent === 'book'
         ? 'Sign in to book this charger. We will bring you back to your booking after login.'
         : loginIntent === 'host'
-          ? 'Host dashboard access requires a host account. Sign in as a host to continue.'
+          ? 'Sign in to unlock the host dashboard.'
           : undefined;
-    const loginDefaultRole =
-      loginIntent === 'host' ? 'host' : loginIntent === 'book' ? 'driver' : undefined;
     return (
       <LoginPage
         onLogin={handleLogin}
         onForgotPassword={handleForgotPassword}
         onNavigateToRegister={() => setAuthState('register')}
         notice={loginMessage}
-        defaultRole={loginDefaultRole}
       />
     );
   }
@@ -186,7 +221,7 @@ const App = () => {
       loginIntent === 'book'
         ? 'Create an account to book your selected charger. We will bring you back to your booking after signup.'
         : loginIntent === 'host'
-          ? 'Host dashboard access requires a host account. Create a host account to continue.'
+          ? 'Create an account to unlock the host dashboard.'
           : undefined;
     return (
       <RegisterPage
@@ -212,8 +247,37 @@ const App = () => {
           isAuthenticated={authState === 'authenticated'}
           onLoginClick={() => handleLoginRequest('general')}
           onLogout={handleLogout}
-          authRole={authRole}
+          authRole={authSession?.user.role ?? null}
           locationLabel={viewMode === 'driver' ? driverConfig?.locationLabel : undefined}
+        />
+        <ProfileGateModal
+          isOpen={profileGateMode !== null}
+          mode={profileGateMode ?? 'driver'}
+          onClose={() => {
+            setProfileGateMode(null);
+            setPendingViewMode(null);
+          }}
+          onSave={async (mode, payload) => {
+            if (!authSession) return;
+            if (mode === 'driver') {
+              await saveDriverProfile(payload as DriverProfileInput);
+              const updatedUser = { ...authSession.user, driverProfileComplete: true };
+              const updatedSession = { ...authSession, user: updatedUser };
+              setAuthSession(updatedSession);
+              persistAuthSession(updatedSession);
+            } else {
+              await saveHostProfile(payload as HostProfileInput);
+              const updatedUser = { ...authSession.user, hostProfileComplete: true };
+              const updatedSession = { ...authSession, user: updatedUser };
+              setAuthSession(updatedSession);
+              persistAuthSession(updatedSession);
+            }
+            setProfileGateMode(null);
+            if (pendingViewMode) {
+              setViewMode(pendingViewMode);
+              setPendingViewMode(null);
+            }
+          }}
         />
         <main id="main-content" className="flex-1 overflow-hidden">
           <Suspense
@@ -232,6 +296,14 @@ const App = () => {
                 onLoginRequest={handleLoginRequest}
                 pendingBookingStationId={pendingBookingStationId}
                 onPendingBookingHandled={handlePendingBookingHandled}
+                driverProfileComplete={driverProfileComplete}
+                onRequireDriverProfile={() => {
+                  if (authState !== 'authenticated') return;
+                  if (!driverProfileComplete && !isAdmin) {
+                    setPendingViewMode('driver');
+                    setProfileGateMode('driver');
+                  }
+                }}
               />
             ) : (
               <HostView />

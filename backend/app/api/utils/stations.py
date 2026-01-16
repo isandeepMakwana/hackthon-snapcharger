@@ -22,7 +22,11 @@ def distance_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     return radius_km * c
 
 
-def build_station_out(station: Station, distance_value: float | None = None) -> StationOut:
+def build_station_out(
+    station: Station,
+    distance_value: float | None = None,
+    booked_time_slots: list[str] | None = None
+) -> StationOut:
     distance = f'{distance_value:.1f} km' if distance_value is not None else '0.0 km'
     payload = {
         'id': station.id,
@@ -41,7 +45,9 @@ def build_station_out(station: Station, distance_value: float | None = None) -> 
         'lat': station.lat,
         'lng': station.lng,
         'distance': distance,
-        'phone_number': station.phone_number
+        'phone_number': station.phone_number,
+        'supported_vehicle_types': station.supported_vehicle_types or [],
+        'booked_time_slots': booked_time_slots or []
     }
     return StationOut.model_validate(payload)
 

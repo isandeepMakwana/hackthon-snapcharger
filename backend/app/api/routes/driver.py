@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from starlette import status
-from app.api.deps import get_db, require_role
+from app.api.deps import get_db, require_driver_profile
 from app.api.utils.stations import build_station_out, distance_km, parse_power_kw
 from app.db.models.booking import Booking
 from app.db.models.station import Station
@@ -15,7 +15,8 @@ from app.models.driver import (
     DriverFilterTag,
     DriverLegendItem,
     DriverLocation,
-    DriverStatusOption
+    DriverStatusOption,
+    DriverVehicleTypeOption
 )
 from app.models.station import StationOut
 
@@ -40,11 +41,32 @@ STATUS_OPTIONS = [
     {'value': 'OFFLINE', 'label': 'Offline'}
 ]
 
+VEHICLE_TYPE_OPTIONS = [
+    {'value': 'ALL', 'label': 'All Vehicles'},
+    {'value': '2W', 'label': '2 Wheeler'},
+    {'value': '4W', 'label': '4 Wheeler'}
+]
+
 LEGEND_ITEMS = [
     {'status': 'AVAILABLE', 'label': 'Available'},
     {'status': 'BUSY', 'label': 'Busy'},
     {'status': 'OFFLINE', 'label': 'Offline'}
 ]
+
+
+def _fetch_booked_slots(db: Session, station_ids: list[str]) -> dict[str, list[str]]:
+    if not station_ids:
+        return {}
+    bookings = db.query(Booking).filter(
+        Booking.station_id.in_(station_ids),
+        Booking.status == 'ACTIVE'
+    ).all()
+    slots: dict[str, list[str]] = {}
+    for booking in bookings:
+        if not booking.start_time:
+            continue
+        slots.setdefault(booking.station_id, []).append(booking.start_time)
+    return slots
 
 
 def _generate_time_slots(
@@ -72,6 +94,7 @@ async def driver_config() -> DriverConfig:
         search_placeholder=SEARCH_PLACEHOLDER,
         filter_tags=[DriverFilterTag(id=item['id'], label=item['label']) for item in FILTER_TAG_DEFINITIONS],
         status_options=[DriverStatusOption(**item) for item in STATUS_OPTIONS],
+        vehicle_type_options=[DriverVehicleTypeOption(**item) for item in VEHICLE_TYPE_OPTIONS],
         legend=[DriverLegendItem(**item) for item in LEGEND_ITEMS],
         booking=BookingConfig(service_fee=SERVICE_FEE, time_slots=_generate_time_slots())
     )
@@ -83,6 +106,7 @@ async def search_stations(
     lng: float = Query(...),
     radius_km: float = Query(SEARCH_RADIUS_KM, ge=0.1, le=100.0),
     status: str | None = Query(default=None),
+    vehicle_type: str | None = Query(default=None),
     tags: list[str] | None = Query(default=None),
     q: str | None = Query(default=None),
     db: Session = Depends(get_db)
@@ -92,6 +116,12 @@ async def search_stations(
 
     if status and status != 'ALL':
         stations = [station for station in stations if station.status == status]
+
+    if vehicle_type and vehicle_type != 'ALL':
+        stations = [
+            station for station in stations
+            if station.supported_vehicle_types and vehicle_type in station.supported_vehicle_types
+        ]
 
     if q:
         query = q.strip().lower()
@@ -128,10 +158,15 @@ async def search_stations(
                 ]
 
     results: list[StationOut] = []
+    candidates: list[tuple[Station, float]] = []
     for station in stations:
         dist = distance_km(lat, lng, station.lat, station.lng)
         if dist <= radius_km:
-            results.append(build_station_out(station, dist))
+            candidates.append((station, dist))
+
+    booked_slots = _fetch_booked_slots(db, [station.id for station, _ in candidates])
+    for station, dist in candidates:
+        results.append(build_station_out(station, dist, booked_slots.get(station.id, [])))
 
     return results
 
@@ -139,7 +174,7 @@ async def search_stations(
 @router.post('/bookings', response_model=StationOut)
 async def create_booking(
     payload: BookingRequest,
-    current_user: User = Depends(require_role('driver', 'admin')),
+    current_user: User = Depends(require_driver_profile),
     db: Session = Depends(get_db)
 ) -> StationOut:
     if not current_user.phone_number:
@@ -155,10 +190,27 @@ async def create_booking(
             detail={'code': 'NOT_FOUND', 'message': 'Station not found.'}
         )
 
-    if station.status != 'AVAILABLE':
+    if station.status == 'OFFLINE':
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={'code': 'UNAVAILABLE', 'message': 'Station is not available.'}
+        )
+
+    if not payload.start_time:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={'code': 'MISSING_TIME_SLOT', 'message': 'Start time is required to book a station.'}
+        )
+
+    existing_booking = db.query(Booking).filter(
+        Booking.station_id == station.id,
+        Booking.status == 'ACTIVE',
+        Booking.start_time == payload.start_time
+    ).first()
+    if existing_booking:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={'code': 'TIME_SLOT_UNAVAILABLE', 'message': 'Selected time slot is already booked.'}
         )
 
     if not station.phone_number:
@@ -176,7 +228,6 @@ async def create_booking(
         start_time=payload.start_time
     ))
 
-    station.status = 'BUSY'
     station.monthly_earnings += station.price_per_hour
     db.commit()
     db.refresh(station)
@@ -185,4 +236,5 @@ async def create_booking(
     if payload.user_lat is not None and payload.user_lng is not None:
         distance_value = distance_km(payload.user_lat, payload.user_lng, station.lat, station.lng)
 
-    return build_station_out(station, distance_value)
+    booked_slots = _fetch_booked_slots(db, [station.id])
+    return build_station_out(station, distance_value, booked_slots.get(station.id, []))

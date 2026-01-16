@@ -38,6 +38,8 @@ const createNewStation = (stationData: Partial<Station>): Station => ({
   lng: stationData.lng ?? 73.8567,
   distance: stationData.distance || '0.1 km',
   phoneNumber: stationData.phoneNumber,
+  supportedVehicleTypes: stationData.supportedVehicleTypes ?? ['2W', '4W'],
+  bookedTimeSlots: stationData.bookedTimeSlots ?? [],
 });
 
 const initialState = {

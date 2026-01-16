@@ -20,6 +20,10 @@ const MOCK_DRIVER_CONFIG = {
     { value: 'ALL', label: 'All Status' },
     { value: 'AVAILABLE', label: 'Available' },
   ],
+  vehicleTypeOptions: [
+    { value: 'ALL', label: 'All Vehicles' },
+    { value: '2W', label: '2 Wheeler' },
+  ],
   legend: [
     { status: 'AVAILABLE', label: 'Available' }
   ],
@@ -56,6 +60,8 @@ test('filters stations by search query', async () => {
       onLoginRequest={jest.fn()}
       pendingBookingStationId={null}
       onPendingBookingHandled={jest.fn()}
+      driverProfileComplete={true}
+      onRequireDriverProfile={jest.fn()}
     />
   );
 
@@ -76,6 +82,8 @@ test('booking flow updates station status', async () => {
       onLoginRequest={jest.fn()}
       pendingBookingStationId={null}
       onPendingBookingHandled={jest.fn()}
+      driverProfileComplete={true}
+      onRequireDriverProfile={jest.fn()}
     />
   );
 

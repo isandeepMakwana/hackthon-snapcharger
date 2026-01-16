@@ -14,6 +14,8 @@ interface DriverViewProps {
   onLoginRequest: (intent?: 'general' | 'book' | 'host', stationId?: string) => void;
   pendingBookingStationId?: string | null;
   onPendingBookingHandled: () => void;
+  driverProfileComplete: boolean;
+  onRequireDriverProfile: () => void;
 }
 
 const DriverView = ({
@@ -21,6 +23,8 @@ const DriverView = ({
   onLoginRequest,
   pendingBookingStationId,
   onPendingBookingHandled,
+  driverProfileComplete,
+  onRequireDriverProfile,
 }: DriverViewProps) => {
   const stations = useStationStore((state) => state.stations);
   const loadStations = useStationStore((state) => state.loadStations);
@@ -36,17 +40,25 @@ const DriverView = ({
   const [activeTab, setActiveTab] = useState<'overview' | 'reviews' | 'about'>('overview');
   const [selectedTimeSlot, setSelectedTimeSlot] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [vehicleType, setVehicleType] = useState('ALL');
   const [activeTags, setActiveTags] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-
-  const availableSlots = useMemo(() => driverConfig?.booking.timeSlots ?? [], [driverConfig]);
-  const handleClearSelection = useCallback(() => setSelectedStationId(null), []);
-  const handleSelectStation = useCallback((station: Station) => setSelectedStationId(station.id), []);
 
   const selectedStation = useMemo(
     () => stations.find((station) => station.id === selectedStationId) || null,
     [stations, selectedStationId]
   );
+  const availableSlots = useMemo(() => driverConfig?.booking.timeSlots ?? [], [driverConfig]);
+  const bookedSlots = useMemo(
+    () => selectedStation?.bookedTimeSlots ?? [],
+    [selectedStation]
+  );
+  const selectableSlots = useMemo(
+    () => availableSlots.filter((slot) => !bookedSlots.includes(slot)),
+    [availableSlots, bookedSlots]
+  );
+  const handleClearSelection = useCallback(() => setSelectedStationId(null), []);
+  const handleSelectStation = useCallback((station: Station) => setSelectedStationId(station.id), []);
 
   useEffect(() => {
     let isMounted = true;
@@ -57,6 +69,7 @@ const DriverView = ({
         if (!isMounted) return;
         setDriverConfig(config);
         setStatusFilter((prev) => prev || config.statusOptions[0]?.value || 'ALL');
+        setVehicleType((prev) => prev || config.vehicleTypeOptions[0]?.value || 'ALL');
         if (config.booking.timeSlots.length > 0) {
           setSelectedTimeSlot(config.booking.timeSlots[0]);
         }
@@ -75,10 +88,15 @@ const DriverView = ({
   }, [setDriverConfig]);
 
   useEffect(() => {
-    if (selectedStation) {
-      setSelectedTimeSlot(availableSlots[0] ?? '');
+    if (!selectedStation) return;
+    if (!selectableSlots.length) {
+      setSelectedTimeSlot('');
+      return;
     }
-  }, [selectedStation, availableSlots]);
+    if (!selectableSlots.includes(selectedTimeSlot)) {
+      setSelectedTimeSlot(selectableSlots[0]);
+    }
+  }, [selectedStation, selectableSlots, selectedTimeSlot]);
 
   useEffect(() => {
     if (!selectedStationId) return;
@@ -113,6 +131,7 @@ const DriverView = ({
           lng: driverConfig.location.lng,
           radiusKm: driverConfig.searchRadiusKm,
           status: statusFilter,
+          vehicleType,
           tags: activeTags,
           query: searchQuery.trim() ? searchQuery.trim() : undefined
         });
@@ -126,7 +145,7 @@ const DriverView = ({
     const delay = searchQuery.trim() ? 300 : 0;
     const timeout = window.setTimeout(fetchStations, delay);
     return () => window.clearTimeout(timeout);
-  }, [driverConfig, statusFilter, activeTags, searchQuery, loadStations]);
+  }, [driverConfig, statusFilter, vehicleType, activeTags, searchQuery, loadStations]);
 
   useEffect(() => {
     if (!selectedStationId) return;
@@ -136,8 +155,16 @@ const DriverView = ({
 
   const initiateBooking = () => {
     if (!selectedStation || selectedStation.status !== StationStatus.AVAILABLE) return;
+    if (!selectedTimeSlot) {
+      setErrorMessage('Select a time slot to book this charger.');
+      return;
+    }
     if (!isLoggedIn) {
       onLoginRequest('book', selectedStation.id);
+      return;
+    }
+    if (!driverProfileComplete) {
+      onRequireDriverProfile();
       return;
     }
     setShowBookingConfirm(true);
@@ -168,13 +195,24 @@ const DriverView = ({
 
   useEffect(() => {
     if (!isLoggedIn || !pendingBookingStationId) return;
+    if (!driverProfileComplete) {
+      onRequireDriverProfile();
+      return;
+    }
     const station = stations.find((item) => item.id === pendingBookingStationId);
     if (station) {
       setSelectedStationId(station.id);
       setShowBookingConfirm(true);
     }
     onPendingBookingHandled();
-  }, [isLoggedIn, pendingBookingStationId, stations, onPendingBookingHandled]);
+  }, [
+    isLoggedIn,
+    pendingBookingStationId,
+    stations,
+    onPendingBookingHandled,
+    driverProfileComplete,
+    onRequireDriverProfile
+  ]);
 
   const handleDirections = () => {
     if (!selectedStation) return;
@@ -300,12 +338,15 @@ const DriverView = ({
           <DriverFilters
             statusFilter={statusFilter}
             setStatusFilter={setStatusFilter}
+            vehicleType={vehicleType}
+            setVehicleType={setVehicleType}
             activeTags={activeTags}
             toggleTag={toggleTag}
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
             filterTags={driverConfig?.filterTags ?? []}
             statusOptions={driverConfig?.statusOptions ?? []}
+            vehicleTypeOptions={driverConfig?.vehicleTypeOptions ?? []}
             searchPlaceholder={driverConfig?.searchPlaceholder ?? ''}
           />
           <div className="mt-3 flex items-center justify-between text-xs text-muted">

@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from starlette import status
 from app.api.deps import get_db, get_current_user
+from app.api.utils.users import build_user_out
 from app.core.config import get_settings
 from app.core.mailer import send_password_reset_email, send_verification_email
 from app.core.rate_limit import rate_limit
@@ -41,13 +42,6 @@ async def register(
     request: Request,
     db: Session = Depends(get_db)
 ) -> AuthResponse:
-    role = payload.role or 'driver'
-    if role not in {'driver', 'host'}:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={'code': 'VALIDATION_ERROR', 'message': 'Invalid role.'}
-        )
-
     existing = db.query(User).filter(
         (User.email == payload.email.lower()) | (User.username == payload.username)
     ).first()
@@ -62,7 +56,7 @@ async def register(
         email=payload.email.lower(),
         password_hash=hash_password(payload.password),
         phone_number=payload.phone_number.strip(),
-        role=role,
+        role='member',
         permissions=[]
     )
     db.add(user)
@@ -103,7 +97,7 @@ async def register(
         expires_in=settings.access_token_expire_minutes * 60
     )
 
-    return AuthResponse(user=UserOut.model_validate(user), tokens=tokens)
+    return AuthResponse(user=build_user_out(db, user), tokens=tokens)
 
 
 @router.post(
@@ -146,7 +140,7 @@ async def login(
         expires_in=settings.access_token_expire_minutes * 60
     )
 
-    return AuthResponse(user=UserOut.model_validate(user), tokens=tokens)
+    return AuthResponse(user=build_user_out(db, user), tokens=tokens)
 
 
 @router.post('/refresh', response_model=AuthResponse)
@@ -184,7 +178,7 @@ async def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> Aut
         expires_in=settings.access_token_expire_minutes * 60
     )
 
-    return AuthResponse(user=UserOut.model_validate(user), tokens=tokens)
+    return AuthResponse(user=build_user_out(db, user), tokens=tokens)
 
 
 @router.post('/logout', response_model=MessageResponse)
@@ -224,7 +218,7 @@ async def verify_email(token: str, db: Session = Depends(get_db)) -> EmailVerifi
     record.used_at = datetime.utcnow()
     db.commit()
 
-    return EmailVerificationResponse(user=UserOut.model_validate(user))
+    return EmailVerificationResponse(user=build_user_out(db, user))
 
 
 @router.post(
@@ -288,5 +282,8 @@ async def reset_password(payload: ResetPasswordRequest, db: Session = Depends(ge
 
 
 @router.get('/me', response_model=UserOut)
-async def me(current_user: User = Depends(get_current_user)) -> UserOut:
-    return UserOut.model_validate(current_user)
+async def me(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> UserOut:
+    return build_user_out(db=db, user=current_user)
