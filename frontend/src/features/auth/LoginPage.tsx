@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { ArrowRight, Loader2, Lock, Mail, Zap } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ArrowRight, Car, Home, Loader2, Lock, Mail, Zap } from 'lucide-react';
 
 interface LoginPageProps {
   onLogin: (payload: { email: string; password: string }) => Promise<void>;
