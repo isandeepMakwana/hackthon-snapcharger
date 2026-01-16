@@ -13,6 +13,7 @@ const statusTone: Record<HostBooking['status'], string> = {
 
 const HostBookingCard = ({ booking }: HostBookingCardProps) => {
   const formattedTime = booking.startTime ?? 'Flexible';
+  const formattedDate = booking.bookingDate ?? 'Today';
 
   return (
     <div className="rounded-2xl border border-border bg-surface-strong p-4 shadow-soft">
@@ -36,7 +37,7 @@ const HostBookingCard = ({ booking }: HostBookingCardProps) => {
         </div>
         <div className="flex items-center gap-2">
           <CalendarClock size={16} className="text-muted" />
-          <span>{formattedTime}</span>
+          <span>{formattedDate} · {formattedTime}</span>
         </div>
         <div className="flex items-center gap-2">
           <Phone size={16} className="text-muted" />

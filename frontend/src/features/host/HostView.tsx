@@ -8,6 +8,7 @@ import { StationStatus } from '@/types';
 import { useStationStore } from '@/store/useStationStore';
 import type { HostBooking } from '@/types/booking';
 import { createHostStation, fetchHostBookings, fetchHostStats, fetchHostStations, updateHostStation } from '@/services/hostService';
+import { fetchDriverConfig } from '@/services/driverService';
 
 const AddStationModal = lazy(() => import('@/features/host/AddStationModal'));
 
@@ -23,6 +24,7 @@ const HostView = () => {
   const [editingStation, setEditingStation] = useState<Station | undefined>();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [bookings, setBookings] = useState<HostBooking[]>([]);
+  const [timeSlots, setTimeSlots] = useState<string[]>([]);
 
   const myStations = useMemo(() => stations, [stations]);
 
@@ -40,15 +42,17 @@ const HostView = () => {
 
     const loadHostData = async () => {
       try {
-        const [stationData, statsData, bookingData] = await Promise.all([
+        const [stationData, statsData, bookingData, driverConfig] = await Promise.all([
           fetchHostStations(),
           fetchHostStats(),
-          fetchHostBookings()
+          fetchHostBookings(),
+          fetchDriverConfig()
         ]);
         if (!isMounted) return;
         loadStations(stationData);
         setHostStats(statsData);
         setBookings(bookingData);
+        setTimeSlots(driverConfig.booking.timeSlots ?? []);
         setErrorMessage(null);
       } catch {
         if (!isMounted) return;
@@ -87,6 +91,7 @@ const HostView = () => {
       lng: stationData.lng ?? 73.8567,
       phoneNumber: stationData.phoneNumber,
       supportedVehicleTypes: stationData.supportedVehicleTypes ?? ['2W', '4W'],
+      blockedTimeSlots: stationData.blockedTimeSlots ?? [],
     };
 
     try {
@@ -213,6 +218,7 @@ const HostView = () => {
           onClose={() => setIsModalOpen(false)}
           onAddStation={handleSaveStation}
           initialData={editingStation}
+          timeSlots={timeSlots}
         />
       </Suspense>
     </div>

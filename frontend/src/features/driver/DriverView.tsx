@@ -26,9 +26,15 @@ const DriverView = ({
   driverProfileComplete,
   onRequireDriverProfile,
 }: DriverViewProps) => {
+  const formatDateInput = (value: Date) => {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const stations = useStationStore((state) => state.stations);
   const loadStations = useStationStore((state) => state.loadStations);
-  const bookStation = useStationStore((state) => state.bookStation);
   const saveStation = useStationStore((state) => state.saveStation);
   const driverConfig = useStationStore((state) => state.driverConfig);
   const setDriverConfig = useStationStore((state) => state.setDriverConfig);
@@ -39,6 +45,7 @@ const DriverView = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'reviews' | 'about'>('overview');
   const [selectedTimeSlot, setSelectedTimeSlot] = useState('');
+  const [selectedDate, setSelectedDate] = useState(formatDateInput(new Date()));
   const [statusFilter, setStatusFilter] = useState('');
   const [vehicleType, setVehicleType] = useState('ALL');
   const [activeTags, setActiveTags] = useState<string[]>([]);
@@ -133,7 +140,8 @@ const DriverView = ({
           status: statusFilter,
           vehicleType,
           tags: activeTags,
-          query: searchQuery.trim() ? searchQuery.trim() : undefined
+          query: searchQuery.trim() ? searchQuery.trim() : undefined,
+          bookingDate: selectedDate
         });
         loadStations(data);
         setErrorMessage(null);
@@ -145,7 +153,7 @@ const DriverView = ({
     const delay = searchQuery.trim() ? 300 : 0;
     const timeout = window.setTimeout(fetchStations, delay);
     return () => window.clearTimeout(timeout);
-  }, [driverConfig, statusFilter, vehicleType, activeTags, searchQuery, loadStations]);
+  }, [driverConfig, statusFilter, vehicleType, activeTags, searchQuery, selectedDate, loadStations]);
 
   useEffect(() => {
     if (!selectedStationId) return;
@@ -155,6 +163,10 @@ const DriverView = ({
 
   const initiateBooking = () => {
     if (!selectedStation || selectedStation.status !== StationStatus.AVAILABLE) return;
+    if (!selectedDate) {
+      setErrorMessage('Select a date to book this charger.');
+      return;
+    }
     if (!selectedTimeSlot) {
       setErrorMessage('Select a time slot to book this charger.');
       return;
@@ -174,6 +186,7 @@ const DriverView = ({
     if (!selectedStation || !driverConfig) return;
     createDriverBooking({
       stationId: selectedStation.id,
+      bookingDate: selectedDate,
       startTime: selectedTimeSlot,
       userLat: driverConfig.location.lat,
       userLng: driverConfig.location.lng
@@ -185,9 +198,9 @@ const DriverView = ({
         setShowSuccessToast(true);
         window.setTimeout(() => setShowSuccessToast(false), 3000);
       })
-      .catch(() => {
-        bookStation(selectedStation.id);
-        setErrorMessage('Unable to complete booking. Please try again.');
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : 'Unable to complete booking. Please try again.';
+        setErrorMessage(message);
         window.setTimeout(() => setErrorMessage(null), 3000);
         setShowBookingConfirm(false);
       });
@@ -408,6 +421,8 @@ const DriverView = ({
               availableSlots={availableSlots}
               selectedTimeSlot={selectedTimeSlot}
               onTimeSlotChange={setSelectedTimeSlot}
+              selectedDate={selectedDate}
+              onDateChange={setSelectedDate}
               activeTab={activeTab}
               onTabChange={setActiveTab}
               onClose={handleClearSelection}
