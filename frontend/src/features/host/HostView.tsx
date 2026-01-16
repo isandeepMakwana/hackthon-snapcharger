@@ -91,6 +91,7 @@ const HostView = () => {
       lng: stationData.lng ?? 73.8567,
       phoneNumber: stationData.phoneNumber,
       supportedVehicleTypes: stationData.supportedVehicleTypes ?? ['2W', '4W'],
+      availableTimeSlots: stationData.availableTimeSlots ?? [],
       blockedTimeSlots: stationData.blockedTimeSlots ?? [],
     };
 

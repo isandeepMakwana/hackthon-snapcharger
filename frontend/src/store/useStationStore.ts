@@ -41,6 +41,7 @@ const createNewStation = (stationData: Partial<Station>): Station => ({
   supportedVehicleTypes: stationData.supportedVehicleTypes ?? ['2W', '4W'],
   bookedTimeSlots: stationData.bookedTimeSlots ?? [],
   blockedTimeSlots: stationData.blockedTimeSlots ?? [],
+  availableTimeSlots: stationData.availableTimeSlots ?? [],
 });
 
 const initialState = {

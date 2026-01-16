@@ -55,7 +55,12 @@ const DriverView = ({
     () => stations.find((station) => station.id === selectedStationId) || null,
     [stations, selectedStationId]
   );
-  const availableSlots = useMemo(() => driverConfig?.booking.timeSlots ?? [], [driverConfig]);
+  const availableSlots = useMemo(() => {
+    if (selectedStation?.availableTimeSlots && selectedStation.availableTimeSlots.length > 0) {
+      return selectedStation.availableTimeSlots;
+    }
+    return driverConfig?.booking.timeSlots ?? [];
+  }, [driverConfig, selectedStation]);
   const bookedSlots = useMemo(
     () => selectedStation?.bookedTimeSlots ?? [],
     [selectedStation]

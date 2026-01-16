@@ -30,6 +30,7 @@ export interface Station {
   supportedVehicleTypes?: string[];
   bookedTimeSlots?: string[];
   blockedTimeSlots?: string[];
+  availableTimeSlots?: string[];
 }
 
 export interface HostStats {
