@@ -45,4 +45,6 @@ export interface GeminiAnalysisResult {
   suggestedTitle: string;
   suggestedDescription: string;
   confidence: number;
+  vehicleCompatibility?: string[];
+  visualEvidence?: string;
 }

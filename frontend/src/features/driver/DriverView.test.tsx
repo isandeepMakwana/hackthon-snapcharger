@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import DriverView from '@/features/driver/DriverView';
 import { MOCK_STATIONS } from '@/data/mockStations';
 import { useStationStore } from '@/store/useStationStore';
@@ -55,14 +56,16 @@ beforeEach(() => {
 test('filters stations by search query', async () => {
   const user = userEvent.setup();
   render(
-    <DriverView
-      isLoggedIn={false}
-      onLoginRequest={jest.fn()}
-      pendingBookingStationId={null}
-      onPendingBookingHandled={jest.fn()}
-      driverProfileComplete={true}
-      onRequireDriverProfile={jest.fn()}
-    />
+    <MemoryRouter>
+      <DriverView
+        isLoggedIn={false}
+        onLoginRequest={jest.fn()}
+        pendingBookingStationId={null}
+        onPendingBookingHandled={jest.fn()}
+        driverProfileComplete={true}
+        onRequireDriverProfile={jest.fn()}
+      />
+    </MemoryRouter>
   );
 
   expect(await screen.findByText(/Verma Villa Green Spot/i)).toBeInTheDocument();
@@ -77,14 +80,16 @@ test('filters stations by search query', async () => {
 test('booking flow updates station status', async () => {
   const user = userEvent.setup();
   render(
-    <DriverView
-      isLoggedIn
-      onLoginRequest={jest.fn()}
-      pendingBookingStationId={null}
-      onPendingBookingHandled={jest.fn()}
-      driverProfileComplete={true}
-      onRequireDriverProfile={jest.fn()}
-    />
+    <MemoryRouter>
+      <DriverView
+        isLoggedIn
+        onLoginRequest={jest.fn()}
+        pendingBookingStationId={null}
+        onPendingBookingHandled={jest.fn()}
+        driverProfileComplete={true}
+        onRequireDriverProfile={jest.fn()}
+      />
+    </MemoryRouter>
   );
 
   const stationCard = await screen.findByRole('button', { name: /Verma Villa Green Spot/i });

@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
+import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useStationStore } from '@/store/useStationStore';
@@ -28,7 +29,9 @@ const HostView = lazy(() => import('@/features/host/HostView'));
 type AuthState = 'guest' | 'login' | 'register' | 'authenticated';
 type LoginIntent = 'general' | 'book' | 'host';
 
-const App = () => {
+const AppShell = () => {
+  const { stationSlug } = useParams();
+  const navigate = useNavigate();
   const viewMode = useStationStore((state) => state.viewMode);
   const setViewMode = useStationStore((state) => state.setViewMode);
   const driverConfig = useStationStore((state) => state.driverConfig);
@@ -200,6 +203,18 @@ const App = () => {
     };
   }, [setViewMode]);
 
+  useEffect(() => {
+    if (stationSlug && viewMode !== 'driver') {
+      setViewMode('driver');
+    }
+  }, [stationSlug, viewMode, setViewMode]);
+
+  useEffect(() => {
+    if (viewMode === 'host' && stationSlug) {
+      navigate('/', { replace: true });
+    }
+  }, [viewMode, stationSlug, navigate]);
+
   if (authState === 'login') {
     const loginMessage =
       loginIntent === 'book'
@@ -306,6 +321,7 @@ const App = () => {
                 pendingBookingStationId={pendingBookingStationId}
                 onPendingBookingHandled={handlePendingBookingHandled}
                 driverProfileComplete={driverProfileComplete}
+                stationSlug={stationSlug}
                 onRequireDriverProfile={() => {
                   if (authState !== 'authenticated') return;
                   if (!driverProfileComplete && !isAdmin) {
@@ -324,5 +340,13 @@ const App = () => {
     </div>
   );
 };
+
+const App = () => (
+  <Routes>
+    <Route path="/" element={<AppShell />} />
+    <Route path="/stations/:stationSlug" element={<AppShell />} />
+    <Route path="*" element={<Navigate to="/" replace />} />
+  </Routes>
+);
 
 export default App;

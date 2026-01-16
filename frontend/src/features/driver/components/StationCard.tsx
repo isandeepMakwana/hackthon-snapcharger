@@ -10,10 +10,17 @@ interface StationCardProps {
 
 const StationCard = ({ station, isSelected, onSelect }: StationCardProps) => {
   return (
-    <button
-      type="button"
+    <div
       id={`station-card-${station.id}`}
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
       aria-pressed={isSelected}
       className={`group flex w-full gap-3 rounded-2xl border bg-surface-strong p-3 text-left transition-all focus-visible:outline-none ${
         isSelected
@@ -66,7 +73,7 @@ const StationCard = ({ station, isSelected, onSelect }: StationCardProps) => {
           </span>
         </div>
       </div>
-    </button>
+    </div>
   );
 };
 

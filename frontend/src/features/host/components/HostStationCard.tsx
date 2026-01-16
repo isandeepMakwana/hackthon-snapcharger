@@ -33,7 +33,7 @@ const HostStationCard = ({ station, onToggleStatus, onEdit, isUpdating }: HostSt
 
       <div className="p-5">
         <div className="mb-3">
-          <h3 className="text-lg font-semibold text-ink">{station.title}</h3>
+          <h3 className="text-lg font-semibold text-ink">{station.location}</h3>
           <p className="text-sm text-muted line-clamp-2">{station.description}</p>
         </div>
 

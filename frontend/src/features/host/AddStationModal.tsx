@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Camera, Check, Sparkles, X } from 'lucide-react';
+import { Camera, Check, Info, Sparkles, X } from 'lucide-react';
 import { analyzeChargerImage } from '@/services/geminiService';
 import { analyzeHostPhoto } from '@/services/hostService';
 import type { GeminiAnalysisResult, Station } from '@/types';
@@ -22,12 +22,15 @@ const AddStationModal = ({
   timeSlots,
 }: AddStationModalProps) => {
   const [step, setStep] = useState<Step>('upload');
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [analysisData, setAnalysisData] = useState<GeminiAnalysisResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [addressStatus, setAddressStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [showEvidence, setShowEvidence] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
+    address: '',
     description: '',
     connectorType: '',
     powerOutput: '',
@@ -35,6 +38,8 @@ const AddStationModal = ({
     supportedVehicleTypes: ['2W', '4W'] as Array<'2W' | '4W'>,
     blockedTimeSlots: [] as string[],
     availableTimeSlots: [] as string[],
+    lat: null as number | null,
+    lng: null as number | null,
   });
 
   useEffect(() => {
@@ -50,6 +55,7 @@ const AddStationModal = ({
     if (initialData) {
       setFormData({
         title: initialData.title,
+        address: initialData.location,
         description: initialData.description,
         connectorType: initialData.connectorType,
         powerOutput: initialData.powerOutput,
@@ -59,13 +65,16 @@ const AddStationModal = ({
         availableTimeSlots: (initialData.availableTimeSlots && initialData.availableTimeSlots.length > 0)
           ? initialData.availableTimeSlots
           : timeSlots,
+        lat: initialData.lat ?? null,
+        lng: initialData.lng ?? null,
       });
-      setSelectedImage(initialData.image);
+      setSelectedImages(initialData.image ? [initialData.image] : []);
       setStep('review');
       setAnalysisData(null);
     } else {
       setFormData({
         title: '',
+        address: '',
         description: '',
         connectorType: '',
         powerOutput: '',
@@ -73,11 +82,15 @@ const AddStationModal = ({
         supportedVehicleTypes: ['2W', '4W'],
         blockedTimeSlots: [],
         availableTimeSlots: timeSlots,
+        lat: null,
+        lng: null,
       });
-      setSelectedImage(null);
+      setSelectedImages([]);
       setAnalysisData(null);
       setStep('upload');
     }
+    setAddressStatus('idle');
+    setShowEvidence(false);
   }, [isOpen, initialData]);
 
   useEffect(() => {
@@ -87,6 +100,46 @@ const AddStationModal = ({
       return { ...prev, availableTimeSlots: timeSlots };
     });
   }, [isOpen, timeSlots]);
+
+  useEffect(() => {
+    if (!isOpen || initialData) return;
+    if (!('geolocation' in navigator)) {
+      setAddressStatus('error');
+      return;
+    }
+
+    setAddressStatus('loading');
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        let address = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`
+          );
+          if (response.ok) {
+            const data = await response.json();
+            if (typeof data?.display_name === 'string' && data.display_name.trim().length > 0) {
+              address = data.display_name;
+            }
+          }
+        } catch {
+          // Ignore reverse geocode failures and keep lat/lng string.
+        }
+        setFormData((prev) => {
+          if (prev.address.trim().length > 0) {
+            return { ...prev, lat: latitude, lng: longitude };
+          }
+          return { ...prev, address, lat: latitude, lng: longitude };
+        });
+        setAddressStatus('ready');
+      },
+      () => {
+        setAddressStatus('error');
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  }, [isOpen, initialData]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -109,6 +162,7 @@ const AddStationModal = ({
 
     const socketType = backendResult.socket_type as string | undefined;
     const connectorType = socketType ? connectorMap[socketType] || socketType : 'Unknown';
+    const normalizedConnector = connectorType.toLowerCase() === 'unknown' ? '' : connectorType;
 
     const powerKw = typeof backendResult.power_kw === 'number' ? backendResult.power_kw : 0;
     const powerOutput = powerKw > 0 ? `${powerKw}kW` : '';
@@ -118,28 +172,61 @@ const AddStationModal = ({
         ? backendResult.marketing_description
         : 'AI analysis completed for this charger.';
 
+    const rawCompatibility = Array.isArray(backendResult.vehicle_compatibility)
+      ? backendResult.vehicle_compatibility
+      : [];
+    const hasUnknownCompatibility = rawCompatibility.some(
+      (value: string) => typeof value === 'string' && value.trim().toLowerCase() === 'unknown'
+    );
+    let vehicleCompatibility: string[] | undefined = undefined;
+    if (hasUnknownCompatibility) {
+      vehicleCompatibility = [];
+    } else if (rawCompatibility.length > 0) {
+      vehicleCompatibility = rawCompatibility
+        .map((value: string) => value.trim().toUpperCase())
+        .filter((value: string) => value === '2W' || value === '4W');
+    }
+
+    const visualEvidence =
+      typeof backendResult.visual_evidence === 'string'
+        ? backendResult.visual_evidence.trim()
+        : '';
+
     return {
-      connectorType,
+      connectorType: normalizedConnector,
       powerOutput,
-      suggestedTitle: connectorType ? `${connectorType} charger` : 'EV charger',
+      suggestedTitle: normalizedConnector ? `${normalizedConnector} charger` : 'EV charger',
       suggestedDescription: description,
       confidence: 0.9,
+      vehicleCompatibility,
+      visualEvidence: visualEvidence || undefined,
     };
   };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(event.target.files ?? []).slice(0, 3);
+    if (files.length === 0) return;
 
-    const reader = new FileReader();
-    reader.onload = (ev) => setSelectedImage(ev.target?.result as string);
-    reader.readAsDataURL(file);
+    const previews = await Promise.all(
+      files.map(
+        (file) =>
+          new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => resolve(ev.target?.result as string);
+            reader.onerror = () => reject(new Error('Failed to read image'));
+            reader.readAsDataURL(file);
+          })
+      )
+    );
+
+    setSelectedImages(previews);
 
     setStep('analyzing');
     let result: GeminiAnalysisResult | null = null;
+    const primaryFile = files[0];
 
     try {
-      const backendJson = await analyzeHostPhoto(file);
+      const backendJson = await analyzeHostPhoto(primaryFile);
       if (backendJson && backendJson.ai_data) {
         result = mapBackendResultToGemini(backendJson.ai_data);
       } else {
@@ -150,7 +237,7 @@ const AddStationModal = ({
     }
 
     if (!result) {
-      result = await analyzeChargerImage(file);
+      result = await analyzeChargerImage(primaryFile);
     }
 
     setAnalysisData(result);
@@ -160,23 +247,31 @@ const AddStationModal = ({
       powerOutput: result.powerOutput,
       title: result.suggestedTitle,
       description: result.suggestedDescription,
+      supportedVehicleTypes:
+        result.vehicleCompatibility === undefined
+          ? prev.supportedVehicleTypes
+          : (result.vehicleCompatibility as Array<'2W' | '4W'>),
     }));
     setStep('review');
   };
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
+    if (!isFormValid) return;
     onAddStation({
       id: initialData?.id,
       title: formData.title,
+      location: formData.address,
       description: formData.description,
       connectorType: formData.connectorType,
       powerOutput: formData.powerOutput,
       pricePerHour: Number(formData.pricePerHour),
-      image: selectedImage || '',
+      image: selectedImages[0] || '',
       supportedVehicleTypes: formData.supportedVehicleTypes,
       blockedTimeSlots: formData.blockedTimeSlots,
       availableTimeSlots: formData.availableTimeSlots,
+      lat: formData.lat ?? undefined,
+      lng: formData.lng ?? undefined,
     });
     onClose();
   };
@@ -213,6 +308,25 @@ const AddStationModal = ({
     if (score >= 0.5) return { label: 'Medium Confidence', color: 'bg-warning', text: 'text-warning' };
     return { label: 'Low Confidence', color: 'bg-danger', text: 'text-danger' };
   };
+
+  const textFields = {
+    connector: formData.connectorType,
+    output: formData.powerOutput,
+    title: formData.title,
+    description: formData.description,
+    address: formData.address,
+  };
+  const unknownField = Object.entries(textFields).find(([, value]) =>
+    value.trim().toLowerCase().includes('unknown')
+  );
+  const missingTextField = Object.entries(textFields).find(([, value]) => value.trim().length === 0);
+  const priceValue = Number(formData.pricePerHour);
+  const isPriceValid = Number.isFinite(priceValue) && priceValue > 0;
+  const hasVehicles = formData.supportedVehicleTypes.length > 0;
+  const hasAvailableSlots = formData.availableTimeSlots.length > 0;
+  const hasImages = selectedImages.length > 0;
+  const isFormValid =
+    !unknownField && !missingTextField && isPriceValid && hasVehicles && hasAvailableSlots && hasImages;
 
   return (
     <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4" role="dialog" aria-modal="true">
@@ -263,11 +377,13 @@ const AddStationModal = ({
                 ref={fileInputRef}
                 className="hidden"
                 accept="image/*"
+                multiple
                 onChange={handleFileChange}
               />
               <div className="flex items-center gap-2 text-xs text-muted">
                 <Sparkles size={14} /> Powered by Gemini Vision
               </div>
+              <p className="text-[11px] text-muted">Up to 3 images</p>
             </div>
           )}
 
@@ -281,9 +397,9 @@ const AddStationModal = ({
               </div>
               <h3 className="text-lg font-semibold text-ink">Analyzing Charger...</h3>
               <p className="text-sm text-muted">Identifying connector type & power output</p>
-              {selectedImage && (
+              {selectedImages[0] && (
                 <img
-                  src={selectedImage}
+                  src={selectedImages[0]}
                   alt="Preview"
                   className="mt-4 h-24 w-24 rounded-lg object-cover opacity-60"
                 />
@@ -330,6 +446,8 @@ const AddStationModal = ({
                     id="connectorType"
                     value={formData.connectorType}
                     onChange={(event) => setFormData({ ...formData, connectorType: event.target.value })}
+                    required
+                    aria-invalid={Boolean(unknownField?.[0] === 'connector')}
                     className="mt-1 w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm"
                   />
                 </div>
@@ -341,6 +459,8 @@ const AddStationModal = ({
                     id="powerOutput"
                     value={formData.powerOutput}
                     onChange={(event) => setFormData({ ...formData, powerOutput: event.target.value })}
+                    required
+                    aria-invalid={Boolean(unknownField?.[0] === 'output')}
                     className="mt-1 w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm"
                   />
                 </div>
@@ -354,6 +474,8 @@ const AddStationModal = ({
                   id="listingTitle"
                   value={formData.title}
                   onChange={(event) => setFormData({ ...formData, title: event.target.value })}
+                  required
+                  aria-invalid={Boolean(unknownField?.[0] === 'title')}
                   className="mt-1 w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm"
                 />
               </div>
@@ -367,8 +489,31 @@ const AddStationModal = ({
                   value={formData.description}
                   onChange={(event) => setFormData({ ...formData, description: event.target.value })}
                   rows={3}
+                  required
+                  aria-invalid={Boolean(unknownField?.[0] === 'description')}
                   className="mt-1 w-full resize-none rounded-xl border border-border bg-surface px-3 py-2 text-sm"
                 />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold uppercase text-muted" htmlFor="address">
+                  Address
+                </label>
+                <textarea
+                  id="address"
+                  value={formData.address}
+                  onChange={(event) => setFormData({ ...formData, address: event.target.value })}
+                  rows={2}
+                  required
+                  aria-invalid={Boolean(unknownField?.[0] === 'address')}
+                  className="mt-1 w-full resize-none rounded-xl border border-border bg-surface px-3 py-2 text-sm"
+                />
+                {addressStatus === 'loading' && (
+                  <p className="mt-1 text-xs text-muted">Detecting current location...</p>
+                )}
+                {addressStatus === 'error' && (
+                  <p className="mt-1 text-xs text-muted">Enable location access to auto-fill the address.</p>
+                )}
               </div>
 
               <div>
@@ -381,6 +526,8 @@ const AddStationModal = ({
                   min="0"
                   value={formData.pricePerHour}
                   onChange={(event) => setFormData({ ...formData, pricePerHour: event.target.value })}
+                  required
+                  aria-invalid={!isPriceValid}
                   className="mt-1 w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm font-semibold"
                 />
               </div>
@@ -453,13 +600,61 @@ const AddStationModal = ({
                 )}
               </div>
 
-              {selectedImage && (
-                <div className="text-xs text-muted">
-                  {initialData ? 'Using current image' : 'Based on uploaded image'}
+              {selectedImages.length > 0 && (
+                <div className="flex items-center gap-2 text-xs text-muted">
+                  <span>{initialData ? 'Using current image(s)' : 'Based on uploaded image(s)'}</span>
+                  {analysisData?.visualEvidence && (
+                    <button
+                      type="button"
+                      onClick={() => setShowEvidence((prev) => !prev)}
+                      className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2 py-0.5 text-[11px] font-semibold text-muted transition hover:text-ink"
+                      aria-label="Show visual evidence"
+                    >
+                      <Info size={12} /> i
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {analysisData?.visualEvidence && showEvidence && (
+                <div className="rounded-xl border border-border bg-surface px-3 py-2 text-xs text-muted">
+                  {analysisData.visualEvidence}
+                </div>
+              )}
+
+              {selectedImages.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold uppercase text-muted">Images</p>
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    {selectedImages.map((image, index) => (
+                      <div key={`${image}-${index}`} className="relative overflow-hidden rounded-xl border border-border">
+                        <img
+                          src={image}
+                          alt={`Station image ${index + 1}`}
+                          className="h-20 w-full object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
               <div className="flex justify-end gap-3 border-t border-border pt-4">
+                {(missingTextField || unknownField || !isPriceValid || !hasVehicles || !hasAvailableSlots || !hasImages) && (
+                  <p className="mr-auto text-xs font-semibold text-rose-600">
+                    {unknownField
+                      ? `Remove "unknown" from ${unknownField[0]}`
+                      : !hasImages
+                        ? 'Upload at least one image.'
+                      : !hasVehicles
+                        ? 'Select at least one supported vehicle type.'
+                        : !hasAvailableSlots
+                          ? 'Select at least one available time slot.'
+                          : !isPriceValid
+                            ? 'Enter a valid price per hour.'
+                            : 'Fill in all required fields.'}
+                  </p>
+                )}
                 {!initialData && (
                   <button
                     type="button"
@@ -471,7 +666,8 @@ const AddStationModal = ({
                 )}
                 <button
                   type="submit"
-                  className="flex items-center gap-2 rounded-xl bg-accent px-5 py-2 text-sm font-semibold text-white shadow-soft transition hover:bg-accent-strong"
+                  disabled={!isFormValid}
+                  className="flex items-center gap-2 rounded-xl bg-accent px-5 py-2 text-sm font-semibold text-white shadow-soft transition hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Check size={18} /> {initialData ? 'Save Changes' : 'Publish Listing'}
                 </button>

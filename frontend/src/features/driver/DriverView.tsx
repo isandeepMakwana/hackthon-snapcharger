@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { CalendarClock, CheckCircle, Filter } from 'lucide-react';
 import DriverFilters from '@/features/driver/components/DriverFilters';
 import MapCanvas from '@/features/driver/components/MapCanvas';
@@ -15,6 +16,7 @@ interface DriverViewProps {
   pendingBookingStationId?: string | null;
   onPendingBookingHandled: () => void;
   driverProfileComplete: boolean;
+  stationSlug?: string;
   onRequireDriverProfile: () => void;
 }
 
@@ -24,6 +26,7 @@ const DriverView = ({
   pendingBookingStationId,
   onPendingBookingHandled,
   driverProfileComplete,
+  stationSlug,
   onRequireDriverProfile,
 }: DriverViewProps) => {
   const formatDateInput = (value: Date) => {
@@ -40,6 +43,7 @@ const DriverView = ({
   const setDriverConfig = useStationStore((state) => state.setDriverConfig);
 
   const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
+  const navigate = useNavigate();
   const [showBookingConfirm, setShowBookingConfirm] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -69,8 +73,31 @@ const DriverView = ({
     () => availableSlots.filter((slot) => !bookedSlots.includes(slot)),
     [availableSlots, bookedSlots]
   );
-  const handleClearSelection = useCallback(() => setSelectedStationId(null), []);
-  const handleSelectStation = useCallback((station: Station) => setSelectedStationId(station.id), []);
+  const normalizeStationSlug = useCallback((value: string) => {
+    return value.trim().toLowerCase().replace(/\s+/g, '-');
+  }, []);
+
+  const getStationSlug = useCallback(
+    (station: Station) => encodeURIComponent(normalizeStationSlug(station.title)),
+    [normalizeStationSlug]
+  );
+
+  const selectStation = useCallback((station: Station) => {
+    setSelectedStationId(station.id);
+  }, []);
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedStationId(null);
+    navigate('/', { replace: true });
+  }, [navigate]);
+
+  const handleSelectStation = useCallback(
+    (station: Station) => {
+      selectStation(station);
+      navigate(`/stations/${getStationSlug(station)}`);
+    },
+    [navigate, getStationSlug, selectStation]
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -118,6 +145,28 @@ const DriverView = ({
       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 120);
   }, [selectedStationId]);
+
+  useEffect(() => {
+    if (!stationSlug || stations.length === 0) return;
+    let decodedSlug = stationSlug;
+    try {
+      decodedSlug = decodeURIComponent(stationSlug);
+    } catch {
+      setSelectedStationId(null);
+      navigate('/', { replace: true });
+      return;
+    }
+    const normalizedSlug = normalizeStationSlug(decodedSlug);
+    const match = stations.find(
+      (station) => normalizeStationSlug(station.title) === normalizedSlug
+    );
+    if (match) {
+      setSelectedStationId(match.id);
+    } else {
+      setSelectedStationId(null);
+      navigate('/', { replace: true });
+    }
+  }, [stationSlug, stations, normalizeStationSlug, navigate]);
 
   useEffect(() => {
     if (!showBookingConfirm) return;
@@ -385,17 +434,23 @@ const DriverView = ({
             </div>
           ) : (
             stations.map((station, index) => (
-              <div
+              <Link
                 key={station.id}
-                style={{ animationDelay: `${index * 40}ms` }}
-                className="animate-fade-up"
+                to={`/stations/${getStationSlug(station)}`}
+                onClick={() => selectStation(station)}
+                className="block"
               >
-                <StationCard
-                  station={station}
-                  isSelected={selectedStationId === station.id}
-                  onSelect={() => handleSelectStation(station)}
-                />
-              </div>
+                <div
+                  style={{ animationDelay: `${index * 40}ms` }}
+                  className="animate-fade-up"
+                >
+                  <StationCard
+                    station={station}
+                    isSelected={selectedStationId === station.id}
+                    onSelect={() => selectStation(station)}
+                  />
+                </div>
+              </Link>
             ))
           )}
           <div className="h-20 md:h-0" />
