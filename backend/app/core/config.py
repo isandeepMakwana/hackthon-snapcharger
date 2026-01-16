@@ -11,7 +11,7 @@ class Settings(BaseSettings):
 
     jwt_secret_key: str = Field(min_length=32)
     jwt_refresh_secret_key: str = Field(min_length=32)
-    access_token_expire_minutes: int = 15
+    access_token_expire_minutes: int = 1440  # 24 hours (1 day)
     refresh_token_expire_days: int = 30
     bcrypt_rounds: int = 12
 

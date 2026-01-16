@@ -42,11 +42,13 @@ async def upsert_driver_profile(
     if profile:
         profile.vehicle_type = payload.vehicle_type
         profile.vehicle_model = payload.vehicle_model
+        profile.vehicle_number = payload.vehicle_number
     else:
         profile = DriverProfile(
             user_id=current_user.id,
             vehicle_type=payload.vehicle_type,
-            vehicle_model=payload.vehicle_model
+            vehicle_model=payload.vehicle_model,
+            vehicle_number=payload.vehicle_number
         )
         db.add(profile)
     db.commit()

@@ -9,6 +9,7 @@ import { useStationStore } from '@/store/useStationStore';
 import type { HostBooking } from '@/types/booking';
 import { createHostStation, fetchHostBookings, fetchHostStats, fetchHostStations, updateHostStation } from '@/services/hostService';
 import { fetchDriverConfig } from '@/services/driverService';
+import { loadAuthSession } from '@/services/authService';
 
 const AddStationModal = lazy(() => import('@/features/host/AddStationModal'));
 
@@ -28,6 +29,9 @@ const HostView = () => {
   const [updatingStations, setUpdatingStations] = useState<Set<string>>(new Set());
 
   const myStations = useMemo(() => stations, [stations]);
+  
+  const currentUser = loadAuthSession()?.user;
+  const userName = currentUser?.username || 'Host';
 
   const refreshStats = async () => {
     try {
@@ -150,7 +154,7 @@ const HostView = () => {
         <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">Host Dashboard</p>
-            <h1 className="text-2xl font-semibold text-ink">Welcome back, Sandeep</h1>
+            <h1 className="text-2xl font-semibold text-ink">Welcome back, {userName}</h1>
             <p className="text-sm text-muted">Monitor earnings and keep your stations active.</p>
           </div>
           <button

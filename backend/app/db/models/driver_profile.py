@@ -12,5 +12,7 @@ class DriverProfile(Base):
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey('users.id'), unique=True, index=True, nullable=False)
     vehicle_type: Mapped[str] = mapped_column(String(5), nullable=False)
     vehicle_model: Mapped[str] = mapped_column(String(120), nullable=False)
+    vehicle_number: Mapped[str | None] = mapped_column(String(20), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+

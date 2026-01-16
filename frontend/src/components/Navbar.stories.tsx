@@ -9,6 +9,7 @@ const meta: Meta<typeof Navbar> = {
   args: {
     onLoginClick: action('onLoginClick'),
     onLogout: action('onLogout'),
+    onEditProfile: action('onEditProfile'),
     isAuthenticated: false,
     authRole: null,
     viewSwitcher: (

@@ -30,6 +30,14 @@ class UserUpdate(CamelModel):
     permissions: Optional[List[str]] = None
 
 
+class UserProfileUpdate(CamelModel):
+    """Model for users updating their own profile"""
+    username: Optional[str] = Field(default=None, min_length=3, max_length=50)
+    email: Optional[EmailStr] = None
+    phone_number: Optional[str] = Field(default=None, min_length=7, max_length=30)
+    password: Optional[str] = Field(default=None, min_length=8, max_length=128)
+
+
 class UserOut(CamelModel):
     id: str
     username: str

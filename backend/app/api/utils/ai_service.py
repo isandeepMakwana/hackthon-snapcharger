@@ -79,13 +79,21 @@ async def analyze_charger_image(raw_image_bytes: bytes):
     # We ask for a "confidence_score" to flag manual reviews in production
     prompt = """
         You are an expert **EV Infrastructure Auditor** for "SnapCharge". 
-        Your task is to analyze the provided image(s) of a SINGLE charging station to verify its technical specifications.
+        Your task is to analyze a **set of images** representing a **SINGLE** charging station and synthesize them into one technical report.
 
-        ### ANALYSIS PROTOCOL (Follow in Order):
-        1. **Scan for Text/Labels**: First, look for a specification sticker or nameplate. If visible, EXTRACT the exact Voltage (V), Amperage (A), or Power (kW) from the text. This takes priority over visual estimation.
-        2. **Visual Inspection**: If no text is found, identify the physical connector shape using standard IEC/Indian standards.
-        3. **Synthesize**: Combine details from ALL images provided (e.g., use the close-up for socket type and the wide shot for location context).
-        4. **Safety Check**: Scrutinize for burn marks (blackening around holes), rust, cracks, or exposed copper wires.
+        ### MULTI-IMAGE SYNTHESIS STRATEGY (Read Carefully):
+        You may receive multiple images (e.g., a wide shot, a close-up, a label photo). 
+        **DO NOT analyze them in isolation.** Treat them as pieces of a single puzzle.
+        1. **Best Evidence Rule**: If Image A is blurry but Image B is clear, **ignore Image A** and derive data from Image B.
+        2. **Aggregated Details**: 
+        - *Example*: If Image 1 shows the "Socket Shape" and Image 2 shows the "Specification Sticker", combine these facts into the final JSON.
+        - You do not need all details to be present in every single image. As long as a detail appears clearly in **at least one** image, capture it.
+        3. **Conflict Resolution**: If images seem to contradict, prioritize the image containing **readable text/labels** over visual estimation.
+
+        ### ANALYSIS STEPS:
+        1. **Scan for Labels (Highest Priority)**: Search ALL images for a nameplate or sticker. EXTRACT exact Voltage (V), Amperage (A), or Power (kW).
+        2. **Visual Identification**: Identify the connector shape from the clearest available image using the matrix below.
+        3. **Safety Scan**: Check ALL images for hazards (burn marks, rust, exposed wires). If ANY image shows a hazard, mark `is_safe: false`.
 
         ### TECHNICAL DECISION MATRIX:
         | Visual Cue | Type Enum | Max Power | Vehicle Support |
@@ -96,13 +104,13 @@ async def analyze_charger_image(raw_image_bytes: bytes):
         | Large Combo (Type 2 + DC) | `CCS_2_DC` | ~30.0 kW+ | `["4W"]` |
         | Round "Shower Head" | `GB_T` | ~15.0 kW | `["4W"]` |
 
-        ### ZERO HALLUCINATION RULES:
-        - If the image is blurry or the socket is hidden, set `socket_type` to `"UNKNOWN"`.
-        - Do NOT guess `power_kw`. If unsure, use the conservative minimum (e.g., 3.3 for sockets).
-        - `marketing_description` must be factual, not salesy (e.g., "Wall-mounted 7.2kW AC charger in covered parking").
+        ### HALLUCINATION CONTROLS:
+        - **Partial Data is OK**: If you can only identify the Socket Type but not the exact Power, fill `socket_type` and use the "Conservative Minimum" for power.
+        - **Unsure?**: If NO image provides a clear view of the socket or label, return `socket_type: "UNKNOWN"`.
+        - **Description**: `marketing_description` must be a synthesis of the best available visual data (e.g., "3.3kW 3-pin socket located in a domestic setting").
 
         ### OUTPUT FORMAT:
-        Return **ONLY** a raw JSON object (no markdown, no code blocks):
+        Return **ONLY** a single raw JSON object (no markdown, no code blocks):
         {{
         "socket_type": "Enum",
         "power_kw": Float,
@@ -110,7 +118,7 @@ async def analyze_charger_image(raw_image_bytes: bytes):
         "marketing_description": "String",
         "confidence_score": Float (0.0 to 1.0),
         "vehicle_compatibility": ["String"],
-        "visual_evidence": "String (Briefly explain: 'Found 16A label' or 'Identified 3-pin layout')"
+        "visual_evidence": "String (Explain your source: 'Extracted 7.2kW from label in Image 2' or 'Identified 3-pin shape in Image 1')"
         }}
         """
     

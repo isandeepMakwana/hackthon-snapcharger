@@ -7,6 +7,7 @@ from app.models.base import CamelModel
 class DriverProfileIn(CamelModel):
     vehicle_type: str = Field(min_length=2, max_length=5)
     vehicle_model: str = Field(min_length=2, max_length=120)
+    vehicle_number: Optional[str] = Field(default=None, max_length=20)
 
 
 class DriverProfileOut(CamelModel):
@@ -14,6 +15,7 @@ class DriverProfileOut(CamelModel):
     user_id: str
     vehicle_type: str
     vehicle_model: str
+    vehicle_number: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

@@ -124,3 +124,99 @@ def test_me_returns_user(client):
     assert response.json()['email'] == 'driver@example.com'
     assert response.json()['driverProfileComplete'] is False
     assert response.json()['hostProfileComplete'] is False
+
+
+def test_update_me_username(client):
+    register_response = register_user(client)
+    access_token = register_response.json()['tokens']['accessToken']
+
+    response = client.patch(
+        '/api/auth/me',
+        json={'username': 'newusername'},
+        headers={'Authorization': f'Bearer {access_token}'}
+    )
+    assert response.status_code == 200
+    assert response.json()['username'] == 'newusername'
+
+
+def test_update_me_email(client):
+    register_response = register_user(client)
+    access_token = register_response.json()['tokens']['accessToken']
+
+    response = client.patch(
+        '/api/auth/me',
+        json={'email': 'newemail@example.com'},
+        headers={'Authorization': f'Bearer {access_token}'}
+    )
+    assert response.status_code == 200
+    assert response.json()['email'] == 'newemail@example.com'
+    assert response.json()['emailVerified'] is False  # Should require re-verification
+
+
+def test_update_me_phone_number(client):
+    register_response = register_user(client)
+    access_token = register_response.json()['tokens']['accessToken']
+
+    response = client.patch(
+        '/api/auth/me',
+        json={'phoneNumber': '+919999999999'},
+        headers={'Authorization': f'Bearer {access_token}'}
+    )
+    assert response.status_code == 200
+    assert response.json()['phoneNumber'] == '+919999999999'
+
+
+def test_update_me_password(client):
+    register_response = register_user(client)
+    access_token = register_response.json()['tokens']['accessToken']
+
+    # Update password
+    response = client.patch(
+        '/api/auth/me',
+        json={'password': 'NewPassword456!'},
+        headers={'Authorization': f'Bearer {access_token}'}
+    )
+    assert response.status_code == 200
+
+    # Login with new password
+    login_response = login_user(client, {'password': 'NewPassword456!'})
+    assert login_response.status_code == 200
+
+
+def test_update_me_duplicate_username(client):
+    # Register first user
+    register_user(client)
+    
+    # Register second user
+    register_response = register_user(client, {
+        'username': 'seconduser',
+        'email': 'second@example.com'
+    })
+    access_token = register_response.json()['tokens']['accessToken']
+
+    # Try to update to first user's username
+    response = client.patch(
+        '/api/auth/me',
+        json={'username': 'driverone'},
+        headers={'Authorization': f'Bearer {access_token}'}
+    )
+    assert response.status_code == 409
+    assert response.json()['error']['code'] == 'CONFLICT'
+
+
+def test_update_me_requires_auth(client):
+    response = client.patch('/api/auth/me', json={'username': 'newname'})
+    assert response.status_code == 401
+
+
+def test_update_me_no_fields(client):
+    register_response = register_user(client)
+    access_token = register_response.json()['tokens']['accessToken']
+
+    response = client.patch(
+        '/api/auth/me',
+        json={},
+        headers={'Authorization': f'Bearer {access_token}'}
+    )
+    assert response.status_code == 400
+    assert response.json()['error']['code'] == 'VALIDATION_ERROR'
