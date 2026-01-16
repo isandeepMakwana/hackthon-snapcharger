@@ -137,7 +137,7 @@ const HostView = () => {
   };
 
   return (
-    <div className="flex h-[calc(100vh-64px)] flex-col overflow-y-auto bg-surface">
+    <div className="flex h-full flex-col overflow-y-auto bg-surface">
       <div className="px-4 pt-6 md:px-6">
         {errorMessage && (
           <div
