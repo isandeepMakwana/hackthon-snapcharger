@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from starlette import status
-from app.api.deps import get_db, require_host_profile
+from app.api.deps import get_db, require_host_profile, require_role
 from app.api.utils.stations import build_station_out
 from app.db.models.booking import Booking
 from app.db.models.station import Station
@@ -9,6 +9,12 @@ from app.db.models.user import User
 from app.db.seed import ensure_demo_stations_for_host
 from app.models.booking import HostBookingOut
 from app.models.station import HostStats, StationCreate, StationOut, StationStatus, StationUpdate
+
+from typing import List
+import uuid
+from io import BytesIO
+from app.api.utils.ai_service import analyze_charger_image, optimize_image_for_gemini
+from app.api.utils.s3_service import upload_file_to_s3
 
 router = APIRouter(prefix='/api/host', tags=['host'])
 
@@ -44,7 +50,7 @@ async def list_stations(
     current_user: User = Depends(require_host_profile),
     db: Session = Depends(get_db)
 ) -> list[StationOut]:
-    ensure_demo_stations_for_host(db, current_user)
+    # ensure_demo_stations_for_host(db, current_user)
     stations = db.query(Station).filter(Station.host_id == current_user.id).order_by(
         Station.created_at.desc()
     ).all()
@@ -164,12 +170,47 @@ async def update_station(
 @router.post('/analyze-photo')
 async def analyze_photo(
     current_user: User = Depends(require_host_profile),
-    file: UploadFile | None = File(default=None)
+    file: UploadFile = File(...)
 ) -> dict:
-    return {
-        'ai_data': {
-            'socket_type': 'TYPE_2_AC',
-            'power_kw': 7.2,
-            'marketing_description': 'Reliable home charger with secure access and easy parking.'
+    """
+    Process station image:
+    1. Optimize (Resize/Compress) to save data.
+    2. Upload to S3 for permanent storage.
+    3. Analyze with Gemini for technical specs.
+    """
+    try:
+        # 1. Read Raw Bytes
+        raw_content = await file.read()
+        
+        # 2. Optimize: Convert to efficient JPEG (Saves 90% bandwidth)
+        # We do this BEFORE S3 upload to save storage costs
+        optimized_content = optimize_image_for_gemini(raw_content)
+        
+        # 3. Upload to S3
+        # Use User ID in filename to prevent collisions/overwrites
+        filename = f"{current_user.id}_{uuid.uuid4()}.jpg"
+        s3_url = upload_file_to_s3(BytesIO(optimized_content), filename)
+        
+        if not s3_url:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={'code': 'UPLOAD_FAILED', 'message': 'S3 Upload Failed'}
+            )
+
+        # 4. Analyze with Gemini
+        # We pass the optimized bytes to save API tokens
+        ai_data = await analyze_charger_image(optimized_content)
+        
+        return {
+            "filename": file.filename,
+            "image_url": s3_url,
+            "ai_data": ai_data
         }
-    }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={'code': 'PROCESSING_ERROR', 'message': str(e)}
+        )
