@@ -78,18 +78,41 @@ async def analyze_charger_image(raw_image_bytes: bytes):
     # 2. Define Strict JSON Schema Prompt
     # We ask for a "confidence_score" to flag manual reviews in production
     prompt = """
-    You are a backend API for an EV Charging Infrastructure system.
-    Analyze the provided image of an electrical point.
-    Extract these technical details into a valid JSON object:
-    - "socket_type": Enum ["SOCKET_16A_3PIN", "TYPE_2_AC", "CCS_2_DC", "IEC_60309", "UNKNOWN"]
-    - "power_kw": Float (Estimate based on type. 3-pin=3.3, Type2=7.2, CCS2=25+)
-    - "is_safe": Boolean (False if burn marks, exposed wires, or rust are visible)
-    - "marketing_description": String (A clean, 1-sentence listing title)
-    - "confidence_score": Float (0.0 to 1.0 - How sure are you?)
-    - "vehicle_compatibility": List of Enums ["2W", "4W", "UNKNOWN"]
-    
-    Return ONLY raw JSON. No markdown formatting.
-    """
+        You are an expert **EV Infrastructure Auditor** for "SnapCharge". 
+        Your task is to analyze the provided image(s) of a SINGLE charging station to verify its technical specifications.
+
+        ### ANALYSIS PROTOCOL (Follow in Order):
+        1. **Scan for Text/Labels**: First, look for a specification sticker or nameplate. If visible, EXTRACT the exact Voltage (V), Amperage (A), or Power (kW) from the text. This takes priority over visual estimation.
+        2. **Visual Inspection**: If no text is found, identify the physical connector shape using standard IEC/Indian standards.
+        3. **Synthesize**: Combine details from ALL images provided (e.g., use the close-up for socket type and the wide shot for location context).
+        4. **Safety Check**: Scrutinize for burn marks (blackening around holes), rust, cracks, or exposed copper wires.
+
+        ### TECHNICAL DECISION MATRIX:
+        | Visual Cue | Type Enum | Max Power | Vehicle Support |
+        | :--- | :--- | :--- | :--- |
+        | 3 Round Pins (Triangle) | `SOCKET_16A_3PIN` | ~3.3 kW | `["2W", "4W"]` (Slow) |
+        | 7 Holes (Mennekes) | `TYPE_2_AC` | ~7.2 kW | `["4W"]` (2W needs adapter) |
+        | 5 Pins (Red Industrial) | `IEC_60309` | ~11.0 kW | `["2W", "4W"]` |
+        | Large Combo (Type 2 + DC) | `CCS_2_DC` | ~30.0 kW+ | `["4W"]` |
+        | Round "Shower Head" | `GB_T` | ~15.0 kW | `["4W"]` |
+
+        ### ZERO HALLUCINATION RULES:
+        - If the image is blurry or the socket is hidden, set `socket_type` to `"UNKNOWN"`.
+        - Do NOT guess `power_kw`. If unsure, use the conservative minimum (e.g., 3.3 for sockets).
+        - `marketing_description` must be factual, not salesy (e.g., "Wall-mounted 7.2kW AC charger in covered parking").
+
+        ### OUTPUT FORMAT:
+        Return **ONLY** a raw JSON object (no markdown, no code blocks):
+        {{
+        "socket_type": "Enum",
+        "power_kw": Float,
+        "is_safe": Boolean,
+        "marketing_description": "String",
+        "confidence_score": Float (0.0 to 1.0),
+        "vehicle_compatibility": ["String"],
+        "visual_evidence": "String (Briefly explain: 'Found 16A label' or 'Identified 3-pin layout')"
+        }}
+        """
     
     try:
         # 3. Call Gemini with MIME type enforcement
@@ -129,6 +152,8 @@ async def analyze_charger_image(raw_image_bytes: bytes):
         # Return specific error state for frontend handling
         return {
             "socket_type": "UNKNOWN",
+            "vehicle_compatibility": ["UNKNOWN"],
+            "detected_address": None,
             "error": "AI Analysis Failed",
             "marketing_description": "Manual verification required."
         }
