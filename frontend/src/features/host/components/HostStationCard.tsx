@@ -11,14 +11,22 @@ interface HostStationCardProps {
 
 const HostStationCard = ({ station, onToggleStatus, onEdit, isUpdating }: HostStationCardProps) => {
   const isOnline = station.status !== StationStatus.OFFLINE;
+  const fallbackImage =
+    'https://images.unsplash.com/photo-1493238792000-8113da705763?auto=format&fit=crop&w=1200&q=80';
+  const imageUrl = station.image?.trim() ? station.image : fallbackImage;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-surface-strong shadow-soft transition hover:shadow-card">
       <div className="relative h-40 bg-slate-200">
         <img
-          src={station.image}
+          src={imageUrl}
           alt={station.title}
           className={`h-full w-full object-cover ${station.status === StationStatus.OFFLINE ? 'grayscale' : ''}`}
+          onError={(event) => {
+            if (event.currentTarget.dataset.fallbackApplied === 'true') return;
+            event.currentTarget.dataset.fallbackApplied = 'true';
+            event.currentTarget.src = fallbackImage;
+          }}
         />
         <div className="absolute right-3 top-3">
           <span

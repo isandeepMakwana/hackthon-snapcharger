@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Camera, Check, Info, Sparkles, X } from 'lucide-react';
 import { analyzeChargerImage } from '@/services/geminiService';
 import { analyzeHostPhoto } from '@/services/hostService';
@@ -25,6 +25,7 @@ const AddStationModal = ({
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [localPreviews, setLocalPreviews] = useState<string[]>([]);
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+  const [s3Status, setS3Status] = useState<'idle' | 'checking' | 'ready' | 'error'>('idle');
   const [analysisData, setAnalysisData] = useState<GeminiAnalysisResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [addressStatus, setAddressStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
@@ -73,6 +74,7 @@ const AddStationModal = ({
       setSelectedImages(initialData.image ? [initialData.image] : []);
       setLocalPreviews([]);
       setUploadedImages([]);
+      setS3Status('idle');
       setStep('review');
       setAnalysisData(null);
     } else {
@@ -92,6 +94,7 @@ const AddStationModal = ({
       setSelectedImages([]);
       setLocalPreviews([]);
       setUploadedImages([]);
+      setS3Status('idle');
       setAnalysisData(null);
       setStep('upload');
     }
@@ -155,8 +158,6 @@ const AddStationModal = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
 
   const mapBackendResultToGemini = (backendResult: any): GeminiAnalysisResult => {
     const connectorMap: Record<string, string> = {
@@ -273,12 +274,48 @@ const AddStationModal = ({
     setStep('review');
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    if (uploadedImages.length === 0) {
+      setS3Status('idle');
+      return;
+    }
+    let isActive = true;
+    const probe = new Image();
+    setS3Status('checking');
+    probe.onload = () => {
+      if (!isActive) return;
+      setS3Status('ready');
+    };
+    probe.onerror = () => {
+      if (!isActive) return;
+      setS3Status('error');
+    };
+    probe.src = uploadedImages[0];
+    return () => {
+      isActive = false;
+    };
+  }, [isOpen, uploadedImages]);
+
+  const displayImages = useMemo(() => {
+    if (uploadedImages.length > 0 && s3Status !== 'error') {
+      return uploadedImages;
+    }
+    if (localPreviews.length > 0) {
+      return localPreviews;
+    }
+    return selectedImages;
+  }, [uploadedImages, s3Status, localPreviews, selectedImages]);
+
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!isFormValid) return;
     
     // Use the first S3 URL if available, otherwise use the first selected image
-    const imageUrl = uploadedImages[0] ?? selectedImages[0] ?? '';
+    const imageUrl =
+      s3Status === 'ready'
+        ? (uploadedImages[0] ?? selectedImages[0] ?? '')
+        : (localPreviews[0] ?? selectedImages[0] ?? '');
     
     onAddStation({
       id: initialData?.id,
@@ -346,9 +383,11 @@ const AddStationModal = ({
   const isPriceValid = Number.isFinite(priceValue) && priceValue > 0;
   const hasVehicles = formData.supportedVehicleTypes.length > 0;
   const hasAvailableSlots = formData.availableTimeSlots.length > 0;
-  const hasImages = selectedImages.length > 0;
+  const hasImages = displayImages.length > 0;
   const isFormValid =
     !unknownField && !missingTextField && isPriceValid && hasVehicles && hasAvailableSlots && hasImages;
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4" role="dialog" aria-modal="true">
@@ -419,9 +458,9 @@ const AddStationModal = ({
               </div>
               <h3 className="text-lg font-semibold text-ink">Analyzing Charger...</h3>
               <p className="text-sm text-muted">Identifying connector type & power output</p>
-              {selectedImages[0] && (
+              {displayImages[0] && (
                 <img
-                  src={selectedImages[0]}
+                  src={displayImages[0]}
                   alt="Preview"
                   className="mt-4 h-24 w-24 rounded-lg object-cover opacity-60"
                 />
@@ -622,7 +661,7 @@ const AddStationModal = ({
                 )}
               </div>
 
-              {selectedImages.length > 0 && (
+              {displayImages.length > 0 && (
                 <div className="flex items-center gap-2 text-xs text-muted">
                   <span>{initialData ? 'Using current image(s)' : 'Based on uploaded image(s)'}</span>
                   {analysisData?.visualEvidence && (
@@ -644,11 +683,11 @@ const AddStationModal = ({
                 </div>
               )}
 
-              {selectedImages.length > 0 && (
+              {displayImages.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold uppercase text-muted">Images ({selectedImages.length})</p>
+                  <p className="text-xs font-semibold uppercase text-muted">Images ({displayImages.length})</p>
                   <div className="mt-2 grid grid-cols-3 gap-2">
-                    {selectedImages.map((image, index) => {
+                    {displayImages.map((image, index) => {
                       const isS3Url = image.includes('s3.') || image.includes('amazonaws.com');
                       const isDataUrl = image.startsWith('data:');
                       
