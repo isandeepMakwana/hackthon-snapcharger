@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.routes import auth, users
+from app.api.routes import auth, users, host
 from app.core.config import get_settings
 from app.core.exceptions import (
     http_exception_handler,
@@ -42,3 +42,4 @@ def health_check() -> dict:
 
 app.include_router(auth.router)
 app.include_router(users.router)
+app.include_router(host.router)

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import HostView from '@/features/host/HostView';
 import { useStationStore } from '@/store/useStationStore';
@@ -26,9 +26,10 @@ test('toggles station availability', async () => {
   if (!toggle) throw new Error('Missing toggle control');
   await user.click(toggle);
 
-  const updatedStation = useStationStore
-    .getState()
-    .stations.find((station) => station.id === '1');
-
-  expect(updatedStation?.status).toBe(StationStatus.OFFLINE);
+  await waitFor(() => {
+    const updatedStation = useStationStore
+      .getState()
+      .stations.find((station) => station.id === '1');
+    expect(updatedStation?.status).toBe(StationStatus.OFFLINE);
+  });
 });

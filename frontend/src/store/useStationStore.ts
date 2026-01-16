@@ -11,6 +11,7 @@ type StationStore = {
   hostStats: HostStats;
   setViewMode: (mode: ViewMode) => void;
   loadStations: (stations: Station[]) => void;
+  setHostStats: (stats: HostStats) => void;
   saveStation: (stationData: Partial<Station>) => void;
   bookStation: (id: string) => void;
   toggleStationStatus: (id: string) => void;
@@ -48,13 +49,15 @@ const initialState = {
 export const useStationStore = create<StationStore>((set) => ({
   ...initialState,
   setViewMode: (mode) => set({ viewMode: mode }),
-  loadStations: (stations) =>
-    set((state) => ({
-      stations: stations.length > 0 ? stations : state.stations,
-    })),
+  loadStations: (stations) => set({ stations }),
+  setHostStats: (stats) => set({ hostStats: stats }),
   saveStation: (stationData) =>
     set((state) => {
       if (stationData.id) {
+        const existing = state.stations.some((station) => station.id === stationData.id);
+        if (!existing) {
+          return { stations: [stationData as Station, ...state.stations] };
+        }
         return {
           stations: state.stations.map((station) =>
             station.id === stationData.id

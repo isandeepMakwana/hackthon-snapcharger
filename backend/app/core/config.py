@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     rate_limit_register_max: int = 5
     rate_limit_reset_max: int = 5
 
+    seed_demo_data: bool = False
+
 
 def get_settings() -> Settings:
     return Settings()

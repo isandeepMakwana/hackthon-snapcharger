@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Camera, Check, Sparkles, X } from 'lucide-react';
 import { analyzeChargerImage } from '@/services/geminiService';
+import { analyzeHostPhoto } from '@/services/hostService';
 import type { GeminiAnalysisResult, Station } from '@/types';
 
 interface AddStationModalProps {
@@ -117,23 +118,11 @@ const AddStationModal = ({
     let result: GeminiAnalysisResult | null = null;
 
     try {
-      const apiBaseUrl =
-        (import.meta as any).env?.VITE_API_BASE_URL || (window as any).VITE_API_BASE_URL || 'http://localhost:8000';
-      const formDataUpload = new FormData();
-      formDataUpload.append('file', file);
-
-      const response = await fetch(`${apiBaseUrl}/api/host/analyze-photo`, {
-        method: 'POST',
-        body: formDataUpload,
-      });
-
-      if (response.ok) {
-        const backendJson = await response.json();
-        if (backendJson && backendJson.ai_data) {
-          result = mapBackendResultToGemini(backendJson.ai_data);
-        } else {
-          result = mapBackendResultToGemini(backendJson);
-        }
+      const backendJson = await analyzeHostPhoto(file);
+      if (backendJson && backendJson.ai_data) {
+        result = mapBackendResultToGemini(backendJson.ai_data);
+      } else {
+        result = mapBackendResultToGemini(backendJson);
       }
     } catch (error) {
       console.error('Backend AI analysis failed, falling back to direct Gemini:', error);

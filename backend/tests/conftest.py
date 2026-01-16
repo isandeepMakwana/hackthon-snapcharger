@@ -12,6 +12,7 @@ os.environ.setdefault('RATE_LIMIT_WINDOW_SECONDS', '60')
 os.environ.setdefault('RATE_LIMIT_LOGIN_MAX', '100')
 os.environ.setdefault('RATE_LIMIT_REGISTER_MAX', '100')
 os.environ.setdefault('RATE_LIMIT_RESET_MAX', '100')
+os.environ.setdefault('SEED_DEMO_DATA', 'false')
 
 from app.main import app
 from app.core.mailer import clear_email_log

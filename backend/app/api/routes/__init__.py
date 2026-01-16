@@ -1,3 +1,3 @@
-from app.api.routes import auth, users
+from app.api.routes import auth, users, host
 
-__all__ = ['auth', 'users']
+__all__ = ['auth', 'users', 'host']
