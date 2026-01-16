@@ -29,6 +29,11 @@ class Station(Base):
         default=lambda: ['2W', '4W'],
         nullable=False
     )
+    available_time_slots: Mapped[list] = mapped_column(
+        JSON,
+        default=list,
+        nullable=False
+    )
     blocked_time_slots: Mapped[list] = mapped_column(
         JSON,
         default=list,

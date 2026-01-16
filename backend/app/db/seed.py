@@ -27,6 +27,8 @@ DEMO_STATIONS = [
         'lng': 73.8940,
         'phone_number': '+919876543210',
         'supported_vehicle_types': ['2W', '4W'],
+        'available_time_slots': [],
+        'blocked_time_slots': [],
         'monthly_earnings': 3200
     },
     {
@@ -44,6 +46,8 @@ DEMO_STATIONS = [
         'lng': 73.7389,
         'phone_number': '+919876543211',
         'supported_vehicle_types': ['2W', '4W'],
+        'available_time_slots': [],
+        'blocked_time_slots': [],
         'monthly_earnings': 4100
     },
     {
@@ -61,6 +65,8 @@ DEMO_STATIONS = [
         'lng': 73.7868,
         'phone_number': '+919876543212',
         'supported_vehicle_types': ['2W', '4W'],
+        'available_time_slots': [],
+        'blocked_time_slots': [],
         'monthly_earnings': 2100
     },
     {
@@ -78,6 +84,8 @@ DEMO_STATIONS = [
         'lng': 73.8433,
         'phone_number': '+919876543213',
         'supported_vehicle_types': ['2W', '4W'],
+        'available_time_slots': [],
+        'blocked_time_slots': [],
         'monthly_earnings': 0
     },
     {
@@ -95,6 +103,8 @@ DEMO_STATIONS = [
         'lng': 73.9143,
         'phone_number': '+919876543214',
         'supported_vehicle_types': ['2W', '4W'],
+        'available_time_slots': [],
+        'blocked_time_slots': [],
         'monthly_earnings': 3050
     }
 ]

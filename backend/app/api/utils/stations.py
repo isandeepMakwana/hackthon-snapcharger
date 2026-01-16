@@ -48,7 +48,8 @@ def build_station_out(
         'phone_number': station.phone_number,
         'supported_vehicle_types': station.supported_vehicle_types or [],
         'booked_time_slots': booked_time_slots or [],
-        'blocked_time_slots': station.blocked_time_slots or []
+        'blocked_time_slots': station.blocked_time_slots or [],
+        'available_time_slots': station.available_time_slots or []
     }
     return StationOut.model_validate(payload)
 

@@ -23,3 +23,15 @@ class HostBookingOut(CamelModel):
     start_time: Optional[str] = None
     status: BookingStatus
     created_at: datetime
+
+
+class BookingOut(CamelModel):
+    id: str
+    station_id: str
+    booking_date: date | None = None
+    start_time: Optional[str] = None
+    status: BookingStatus
+
+
+class BookingStatusUpdate(CamelModel):
+    status: BookingStatus

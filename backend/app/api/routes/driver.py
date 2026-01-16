@@ -4,11 +4,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette import status
 from app.api.deps import get_db, require_driver_profile
+from app.api.utils.bookings import expire_bookings
 from app.api.utils.stations import build_station_out, distance_km, parse_power_kw
 from app.db.models.booking import Booking
 from app.db.models.station import Station
 from app.db.models.user import User
 from app.db.seed import ensure_global_demo_stations
+from app.models.booking import BookingOut, BookingStatusUpdate
 from app.models.driver import (
     BookingConfig,
     BookingRequest,
@@ -28,6 +30,7 @@ SEARCH_RADIUS_KM = 10.0
 DISPLAY_RADIUS_KM = 6.0
 SEARCH_PLACEHOLDER = 'Search by area or host'
 SERVICE_FEE = 10
+SLOT_DURATION_MINUTES = 60
 
 FILTER_TAG_DEFINITIONS = [
     {'id': 'fast_charge', 'label': 'Fast Charge', 'min_power_kw': 11.0},
@@ -84,6 +87,17 @@ def _generate_time_slots() -> list[str]:
     return slots
 
 
+def _parse_start_time(booking_date: date, start_time_str: str) -> datetime:
+    try:
+        parsed = datetime.strptime(start_time_str.strip(), '%I:%M %p')
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={'code': 'INVALID_TIME_SLOT', 'message': 'Start time must match the available slots.'}
+        ) from exc
+    return datetime.combine(booking_date, parsed.time())
+
+
 @router.get('/config', response_model=DriverConfig)
 async def driver_config() -> DriverConfig:
     location = DriverLocation.model_validate(DEFAULT_LOCATION)
@@ -98,7 +112,11 @@ async def driver_config() -> DriverConfig:
         status_options=[DriverStatusOption(**item) for item in STATUS_OPTIONS],
         vehicle_type_options=[DriverVehicleTypeOption(**item) for item in VEHICLE_TYPE_OPTIONS],
         legend=[DriverLegendItem(**item) for item in LEGEND_ITEMS],
-        booking=BookingConfig(service_fee=SERVICE_FEE, time_slots=_generate_time_slots())
+        booking=BookingConfig(
+            service_fee=SERVICE_FEE,
+            time_slots=_generate_time_slots(),
+            slot_duration_minutes=SLOT_DURATION_MINUTES
+        )
     )
 
 
@@ -115,6 +133,7 @@ async def search_stations(
     db: Session = Depends(get_db)
 ) -> list[StationOut]:
     ensure_global_demo_stations(db)
+    expire_bookings(db)
     stations = db.query(Station).all()
     selected_date = booking_date or date.today()
 
@@ -218,12 +237,27 @@ async def create_booking(
             detail={'code': 'MISSING_TIME_SLOT', 'message': 'Start time is required to book a station.'}
         )
 
+    available_slots = station.available_time_slots or _generate_time_slots()
+    if payload.start_time not in available_slots:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={'code': 'INVALID_TIME_SLOT', 'message': 'Selected time slot is not available for this station.'}
+        )
     if payload.start_time in (station.blocked_time_slots or []):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={'code': 'TIME_SLOT_BLOCKED', 'message': 'Selected time slot is blocked by the host.'}
         )
 
+    start_at = _parse_start_time(payload.booking_date, payload.start_time)
+    if payload.booking_date == date.today() and start_at < datetime.utcnow():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={'code': 'TIME_SLOT_PASSED', 'message': 'Selected time slot has already passed.'}
+        )
+    end_at = start_at + timedelta(minutes=SLOT_DURATION_MINUTES)
+
+    expire_bookings(db)
     existing_booking = db.query(Booking).filter(
         Booking.station_id == station.id,
         Booking.status == 'ACTIVE',
@@ -249,7 +283,10 @@ async def create_booking(
         driver_phone_number=current_user.phone_number,
         status='ACTIVE',
         booking_date=payload.booking_date,
-        start_time=payload.start_time
+        start_time=payload.start_time,
+        duration_minutes=SLOT_DURATION_MINUTES,
+        start_at=start_at,
+        end_at=end_at
     ))
 
     station.monthly_earnings += station.price_per_hour
@@ -270,3 +307,41 @@ async def create_booking(
     booked_slots = _fetch_booked_slots(db, [station.id], payload.booking_date)
     merged_slots = list({*booked_slots.get(station.id, []), *(station.blocked_time_slots or [])})
     return build_station_out(station, distance_value, merged_slots)
+
+
+@router.patch('/bookings/{booking_id}', response_model=BookingOut)
+async def update_booking_status(
+    booking_id: str,
+    payload: BookingStatusUpdate,
+    current_user: User = Depends(require_driver_profile),
+    db: Session = Depends(get_db)
+) -> BookingOut:
+    if payload.status != 'CANCELLED':
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={'code': 'INVALID_STATUS', 'message': 'Drivers can only cancel bookings.'}
+        )
+
+    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    if not booking or booking.driver_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={'code': 'NOT_FOUND', 'message': 'Booking not found.'}
+        )
+
+    if booking.status != 'ACTIVE':
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={'code': 'INVALID_STATUS', 'message': 'Booking is not active.'}
+        )
+
+    booking.status = 'CANCELLED'
+    db.commit()
+
+    return BookingOut(
+        id=booking.id,
+        station_id=booking.station_id,
+        booking_date=booking.booking_date,
+        start_time=booking.start_time,
+        status=booking.status
+    )

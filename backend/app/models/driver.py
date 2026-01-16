@@ -41,6 +41,7 @@ class DriverVehicleTypeOption(CamelModel):
 class BookingConfig(CamelModel):
     service_fee: int = Field(ge=0)
     time_slots: list[str]
+    slot_duration_minutes: int = Field(ge=15, le=360)
 
 
 class DriverConfig(CamelModel):
