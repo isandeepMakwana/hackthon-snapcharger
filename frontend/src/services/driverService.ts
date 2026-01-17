@@ -1,5 +1,5 @@
 import type { Station } from '@/types';
-import type { DriverConfig } from '@/types/driver';
+import type { DriverConfig, LocationSearchResult, TripPlanRequest, TripPlanResponse } from '@/types/driver';
 import type { DriverBooking } from '@/types/booking';
 import { loadAuthSession } from '@/services/authService';
 
@@ -86,6 +86,23 @@ export const fetchDriverStations = async (payload: {
     payload.tags.forEach((tag) => params.append('tags', tag));
   }
   return requestJson<Station[]>(`/api/driver/search?${params.toString()}`);
+};
+
+export const searchLocations = async (query: string, radiusKm?: number): Promise<LocationSearchResult[]> => {
+  const params = new URLSearchParams({
+    q: query
+  });
+  if (radiusKm) {
+    params.set('radius_km', String(radiusKm));
+  }
+  return requestJson<LocationSearchResult[]>(`/api/driver/locations/search?${params.toString()}`);
+};
+
+export const planTrip = async (payload: TripPlanRequest): Promise<TripPlanResponse> => {
+  return requestJson<TripPlanResponse>('/api/driver/trip/plan', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
 };
 
 export const fetchDriverConfig = async (): Promise<DriverConfig> => {

@@ -5,12 +5,17 @@ import DriverFilters from '@/features/driver/components/DriverFilters';
 import MapCanvas from '@/features/driver/components/MapCanvas';
 import StationCard from '@/features/driver/components/StationCard';
 import StationDetailPanel from '@/features/driver/components/StationDetailPanel';
+import TripPlannerPanel from '@/features/driver/components/TripPlannerPanel';
 import DriverBookingsView from '@/features/driver/DriverBookingsView';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { Station } from '@/types';
 import { StationStatus } from '@/types';
 import { useStationStore } from '@/store/useStationStore';
 import { createDriverBooking, fetchDriverConfig, fetchDriverStations } from '@/services/driverService';
+import { fetchDriverProfile } from '@/services/profileService';
+import { decodePolyline } from '@/lib/polyline';
+import type { DriverProfile } from '@/types/profile';
+import type { TripPlanResponse, TripStop } from '@/types/driver';
 import { loadAuthSession } from '@/services/authService';
 
 interface DriverViewProps {
@@ -59,8 +64,11 @@ const DriverView = ({
   const [vehicleType, setVehicleType] = useState('ALL');
   const [activeTags, setActiveTags] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeSection, setActiveSection] = useState<'discover' | 'bookings'>('discover');
+  const [activeSection, setActiveSection] = useState<'discover' | 'bookings' | 'trip'>('discover');
   const [searchRadius, setSearchRadius] = useState(10);
+  const [tripPlan, setTripPlan] = useState<TripPlanResponse | null>(null);
+  const [tripStops, setTripStops] = useState<TripStop[]>([]);
+  const [driverProfile, setDriverProfile] = useState<DriverProfile | null>(null);
 
   const getStationKey = useCallback((station: Station) => {
     const title = station.title.trim().toLowerCase();
@@ -95,6 +103,25 @@ const DriverView = ({
     () => uniqueStations.find((station) => station.id === selectedStationId) || null,
     [uniqueStations, selectedStationId]
   );
+  const tripRoutePolyline = useMemo(
+    () => (tripPlan ? decodePolyline(tripPlan.route.polyline) : []),
+    [tripPlan]
+  );
+  const tripRouteStops = useMemo(
+    () =>
+      tripStops.map((stop, index) => ({
+        id: `${index}-${stop.label}`,
+        label: stop.label,
+        lat: stop.lat,
+        lng: stop.lng,
+        type: index === 0 ? 'start' : 'stop'
+      })),
+    [tripStops]
+  );
+  const tripStations = useMemo(
+    () => (tripPlan ? tripPlan.stations.map((entry) => entry.station) : []),
+    [tripPlan]
+  );
   const availableSlots = useMemo(() => {
     if (selectedStation?.availableTimeSlots && selectedStation.availableTimeSlots.length > 0) {
       return selectedStation.availableTimeSlots;
@@ -125,6 +152,11 @@ const DriverView = ({
 
   const selectStation = useCallback((station: Station) => {
     setSelectedStationId(station.id);
+  }, []);
+
+  const handleTripPlanChange = useCallback((plan: TripPlanResponse | null, stops: TripStop[]) => {
+    setTripPlan(plan);
+    setTripStops(stops);
   }, []);
 
   const handleClearSelection = useCallback(() => {
@@ -168,6 +200,26 @@ const DriverView = ({
   }, [setDriverConfig]);
 
   useEffect(() => {
+    if (!isLoggedIn) {
+      setDriverProfile(null);
+      return;
+    }
+    let isMounted = true;
+    fetchDriverProfile()
+      .then((profile) => {
+        if (!isMounted) return;
+        setDriverProfile(profile);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setDriverProfile(null);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [isLoggedIn]);
+
+  useEffect(() => {
     if (!selectedStation) return;
     if (!selectableSlots.length) {
       setSelectedTimeSlot('');
@@ -186,6 +238,12 @@ const DriverView = ({
       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 120);
   }, [selectedStationId]);
+
+  useEffect(() => {
+    if (activeSection !== 'discover' && selectedStationId) {
+      setSelectedStationId(null);
+    }
+  }, [activeSection, selectedStationId]);
 
   useEffect(() => {
     if ((!stationId && !stationSlug) || uniqueStations.length === 0) return;
@@ -381,7 +439,7 @@ const DriverView = ({
   return (
     <Tabs
       value={activeSection}
-      onValueChange={(value) => setActiveSection(value as 'discover' | 'bookings')}
+      onValueChange={(value) => setActiveSection(value as 'discover' | 'bookings' | 'trip')}
       className="flex h-[calc(100vh-64px)] flex-col overflow-hidden"
     >
       <div className="flex items-center justify-between border-b border-border bg-surface-strong/90 px-4 py-3 md:px-6">
@@ -391,6 +449,7 @@ const DriverView = ({
         </div>
         <TabsList aria-label="Driver view toggle">
           <TabsTrigger value="discover">Discover</TabsTrigger>
+          <TabsTrigger value="trip">Trip planner</TabsTrigger>
           <TabsTrigger value="bookings">My bookings</TabsTrigger>
         </TabsList>
       </div>
@@ -595,6 +654,38 @@ const DriverView = ({
                   serviceFee={driverConfig?.booking.serviceFee ?? 0}
                 />
               </>
+            )}
+          </div>
+        </div>
+      </TabsContent>
+
+      <TabsContent value="trip" className="flex-1 min-h-0">
+        <div className="relative flex h-full flex-col overflow-hidden md:flex-row">
+          <div className="order-2 flex h-[60%] w-full flex-col rounded-t-3xl bg-surface-strong shadow-soft md:order-1 md:h-full md:w-5/12 lg:w-4/12 md:rounded-none">
+            <div className="md:hidden flex w-full justify-center pt-3 pb-1">
+              <div className="h-1.5 w-12 rounded-full bg-border" />
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 py-4">
+              {driverConfig && (
+                <TripPlannerPanel
+                  defaultLocation={driverConfig.location}
+                  searchRadiusKm={searchRadius}
+                  defaultVehicleType={driverProfile?.vehicleType}
+                  onPlanChange={handleTripPlanChange}
+                />
+              )}
+            </div>
+          </div>
+
+          <div className="relative z-0 isolate order-1 h-[45%] w-full bg-slate-200 md:order-2 md:h-full md:w-7/12 lg:w-8/12">
+            {driverConfig && (
+              <MapCanvas
+                stations={tripStations}
+                userLocation={driverConfig.location}
+                legendItems={driverConfig.legend}
+                routePolyline={tripRoutePolyline}
+                routeStops={tripRouteStops}
+              />
             )}
           </div>
         </div>

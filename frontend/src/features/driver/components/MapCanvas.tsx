@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Map as LeafletMap, Marker } from 'leaflet';
+import type { Map as LeafletMap, Marker, Polyline } from 'leaflet';
 import { Crosshair } from 'lucide-react';
 import type { Station } from '@/types';
 import { StationStatus } from '@/types';
@@ -8,10 +8,12 @@ import 'leaflet/dist/leaflet.css';
 interface MapCanvasProps {
   stations: Station[];
   selectedStationId?: string;
-  onSelectStation: (station: Station) => void;
-  onClearSelection: () => void;
+  onSelectStation?: (station: Station) => void;
+  onClearSelection?: () => void;
   userLocation: { lat: number; lng: number };
   legendItems?: { status: StationStatus | string; label: string }[];
+  routePolyline?: Array<[number, number]>;
+  routeStops?: Array<{ id: string; label: string; lat: number; lng: number; type: 'start' | 'stop' }>;
 }
 
 const MapCanvas = ({
@@ -21,12 +23,16 @@ const MapCanvas = ({
   onClearSelection,
   userLocation,
   legendItems,
+  routePolyline,
+  routeStops,
 }: MapCanvasProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<LeafletMap | null>(null);
   const markersRef = useRef<Marker[]>([]);
   const leafletRef = useRef<typeof import('leaflet') | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const routeLineRef = useRef<Polyline | null>(null);
+  const stopMarkersRef = useRef<Marker[]>([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -66,7 +72,9 @@ const MapCanvas = ({
 
       leaflet.marker([userLocation.lat, userLocation.lng], { icon: userIcon, zIndexOffset: 1000 }).addTo(map);
 
-      map.on('click', () => onClearSelection());
+      if (onClearSelection) {
+        map.on('click', () => onClearSelection());
+      }
       mapInstanceRef.current = map;
       setMapReady(true);
     };
@@ -129,7 +137,9 @@ const MapCanvas = ({
         icon,
         zIndexOffset: isSelected ? 600 : 0,
       });
-      marker.on('click', () => onSelectStation(station));
+      if (onSelectStation) {
+        marker.on('click', () => onSelectStation(station));
+      }
       marker.addTo(mapInstanceRef.current!);
       markersRef.current.push(marker);
     });
@@ -149,10 +159,51 @@ const MapCanvas = ({
     });
   }, [mapReady, selectedStationId, stations]);
 
+  useEffect(() => {
+    if (!mapReady || !mapInstanceRef.current || !leafletRef.current) return;
+    const leaflet = leafletRef.current;
+
+    if (routeLineRef.current) {
+      routeLineRef.current.remove();
+      routeLineRef.current = null;
+    }
+    stopMarkersRef.current.forEach((marker) => marker.remove());
+    stopMarkersRef.current = [];
+
+    if (!routePolyline || routePolyline.length < 2) return;
+
+    const polyline = leaflet.polyline(routePolyline, {
+      color: '#0ea5e9',
+      weight: 4,
+      opacity: 0.85,
+    });
+    polyline.addTo(mapInstanceRef.current);
+    routeLineRef.current = polyline;
+
+    if (routeStops && routeStops.length > 0) {
+      routeStops.forEach((stop, index) => {
+        const label = stop.type === 'start' ? 'A' : String.fromCharCode(66 + index - 1);
+        const icon = leaflet.divIcon({
+          className: 'leaflet-route-stop',
+          html: `<div class=\"leaflet-route-stop-pin\">${label}</div>`,
+          iconSize: [26, 26],
+          iconAnchor: [13, 13],
+        });
+        const marker = leaflet.marker([stop.lat, stop.lng], { icon, zIndexOffset: 700 });
+        marker.addTo(mapInstanceRef.current!);
+        stopMarkersRef.current.push(marker);
+      });
+    }
+
+    mapInstanceRef.current.fitBounds(polyline.getBounds(), { padding: [40, 40] });
+  }, [mapReady, routePolyline, routeStops]);
+
   const handleRecenter = () => {
     if (mapInstanceRef.current) {
       mapInstanceRef.current.flyTo([userLocation.lat, userLocation.lng], 12);
-      onClearSelection();
+      if (onClearSelection) {
+        onClearSelection();
+      }
     }
   };
 
