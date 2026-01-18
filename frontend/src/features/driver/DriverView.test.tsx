@@ -50,6 +50,14 @@ jest.mock('@/services/driverService', () => ({
   }))
 }));
 
+jest.mock('@/services/profileService', () => ({
+  __esModule: true,
+  fetchDriverProfile: jest.fn(async () => ({
+    vehicleType: '4W',
+    vehicleModel: 'Test Model'
+  }))
+}));
+
 beforeEach(() => {
   useStationStore.getState().reset();
 });

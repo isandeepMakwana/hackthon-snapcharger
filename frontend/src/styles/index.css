@@ -139,6 +139,25 @@
   animation: stationPulse 1.6s ease-out infinite;
 }
 
+.leaflet-route-stop {
+  background: transparent;
+  border: none;
+}
+
+.leaflet-route-stop-pin {
+  display: inline-flex;
+  height: 26px;
+  width: 26px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #0ea5e9;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 6px 14px rgba(14, 165, 233, 0.35);
+}
+
 .leaflet-station-highlight {
   position: absolute;
   inset: -12px;

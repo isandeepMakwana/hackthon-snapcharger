@@ -4,6 +4,14 @@ from sqlalchemy.orm import Session
 from starlette import status
 from app.api.deps import get_db, require_driver_profile
 from app.api.utils.stations import build_station_out, distance_km, parse_power_kw
+from app.api.utils.route_cache import route_cache
+from app.api.utils.route_planner import (
+    build_route_cache_key,
+    decode_polyline,
+    fetch_osrm_route,
+    geocode_query,
+    stations_along_route
+)
 from app.db.models.booking import Booking
 from app.db.models.station import Station
 from app.db.models.user import User
@@ -20,6 +28,15 @@ from app.models.driver import (
     DriverVehicleTypeOption,
     StationReview
 )
+from app.models.trip import (
+    AvailabilitySummary,
+    LocationSearchResult,
+    RouteStationOut,
+    TripLegOut,
+    TripPlanRequest,
+    TripPlanResponse,
+    TripRouteOut
+)
 from app.models.station import StationOut
 from app.models.booking import CompleteBookingRequest
 
@@ -30,6 +47,9 @@ SEARCH_RADIUS_KM = 20.0
 DISPLAY_RADIUS_KM = 20.0
 SEARCH_PLACEHOLDER = 'Search by area or host'
 SERVICE_FEE = 10
+LOCATION_SEARCH_LIMIT = 5
+TRIP_CORRIDOR_KM = 5.0
+TRIP_CACHE_TTL_SECONDS = 900
 
 FILTER_TAG_DEFINITIONS = [
     {'id': 'fast_charge', 'label': 'Fast Charge', 'min_power_kw': 11.0},
@@ -179,6 +199,125 @@ async def search_stations(
 
     print(f"📤 Returning {len(results)} stations")
     return results
+
+
+@router.get('/locations/search', response_model=list[LocationSearchResult])
+async def search_locations(
+    q: str = Query(..., min_length=2),
+    limit: int = Query(LOCATION_SEARCH_LIMIT, ge=1, le=8),
+    radius_km: float = Query(SEARCH_RADIUS_KM, ge=0.1, le=100.0),
+    db: Session = Depends(get_db)
+) -> list[LocationSearchResult]:
+    ensure_global_demo_stations(db)
+    stations = db.query(Station).all()
+    geocoded = await geocode_query(q, limit)
+
+    results: list[LocationSearchResult] = []
+    for location in geocoded:
+        available = 0
+        busy = 0
+        offline = 0
+        for station in stations:
+            if distance_km(location['lat'], location['lng'], station.lat, station.lng) <= radius_km:
+                if station.status == 'AVAILABLE':
+                    available += 1
+                elif station.status == 'BUSY':
+                    busy += 1
+                else:
+                    offline += 1
+        total = available + busy + offline
+        results.append(LocationSearchResult(
+            label=location['label'],
+            lat=location['lat'],
+            lng=location['lng'],
+            availability=AvailabilitySummary(
+                available=available,
+                busy=busy,
+                offline=offline,
+                total=total
+            )
+        ))
+    return results
+
+
+@router.post('/trip/plan', response_model=TripPlanResponse)
+async def plan_trip(
+    payload: TripPlanRequest,
+    db: Session = Depends(get_db)
+) -> TripPlanResponse:
+    if len(payload.stops) < 2:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={'code': 'INVALID_ROUTE', 'message': 'At least two stops are required.'}
+        )
+    ensure_global_demo_stations(db)
+
+    vehicle_type = payload.vehicle_type if payload.vehicle_type in {'2W', '4W'} else None
+    stops = [(stop.lat, stop.lng) for stop in payload.stops]
+    corridor_km = payload.corridor_km or TRIP_CORRIDOR_KM
+    cache_key = build_route_cache_key(stops, vehicle_type, corridor_km)
+    cached = route_cache.get(cache_key)
+    if cached:
+        return TripPlanResponse.model_validate(cached)
+
+    route = await fetch_osrm_route(stops)
+    polyline = route.get('geometry') or ''
+    route_points = decode_polyline(polyline) if polyline else []
+    total_distance_km = (route.get('distance') or 0) / 1000
+    total_duration_min = (route.get('duration') or 0) / 60
+
+    bbox = [0.0, 0.0, 0.0, 0.0]
+    if route_points:
+        lats = [point[0] for point in route_points]
+        lngs = [point[1] for point in route_points]
+        bbox = [min(lats), min(lngs), max(lats), max(lngs)]
+
+    legs = []
+    for idx, leg in enumerate(route.get('legs') or []):
+        from_label = payload.stops[idx].label
+        to_label = payload.stops[min(idx + 1, len(payload.stops) - 1)].label
+        legs.append(TripLegOut(
+            from_label=from_label,
+            to_label=to_label,
+            distance_km=round((leg.get('distance') or 0) / 1000, 2),
+            duration_min=round((leg.get('duration') or 0) / 60, 1)
+        ))
+
+    stations = db.query(Station).all()
+    along_route = stations_along_route(
+        stations,
+        route_points,
+        corridor_km,
+        total_distance_km,
+        total_duration_min,
+        vehicle_type
+    )
+    route_stations = []
+    for entry in along_route:
+        station_out = build_station_out(entry['station'], entry['distance_from_start_km'], [])
+        route_stations.append(RouteStationOut(
+            station=station_out,
+            distance_to_route_km=entry['distance_to_route_km'],
+            distance_from_start_km=entry['distance_from_start_km'],
+            eta_from_start_min=entry['eta_from_start_min'],
+            estimated_charge_min=entry['estimated_charge_min'],
+            capacity_ports=entry['capacity_ports'],
+            available_ports=entry['available_ports']
+        ))
+
+    response = TripPlanResponse(
+        route=TripRouteOut(
+            distance_km=round(total_distance_km, 2),
+            duration_min=round(total_duration_min, 1),
+            polyline=polyline,
+            bbox=bbox,
+            legs=legs
+        ),
+        stations=route_stations
+    )
+
+    route_cache.set(cache_key, response.model_dump(), TRIP_CACHE_TTL_SECONDS)
+    return response
 
 
 @router.get('/bookings', response_model=list[DriverBookingOut])
